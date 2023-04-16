@@ -1,4 +1,4 @@
-QT       += core gui
+QT += core gui sql svg
 QT += websockets network
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
@@ -12,20 +12,32 @@ CONFIG += c++17
 SOURCES += \
     connectiondialog.cpp \
     dialogservers.cpp \
+    dialoguser.cpp \
     main.cpp \
     mainwindow.cpp \
+    qjsontablemodel.cpp \
+    qproxymodel.cpp \
+    tabledelegate.cpp \
+    treeviewmodel.cpp \
     websocketclient.cpp
 
 HEADERS += \
     connectiondialog.h \
     dialogservers.h \
+    dialoguser.h \
     mainwindow.h \
+    qjsontablemodel.h \
+    qproxymodel.h \
+    query_builder.hpp \
     shared_struct.hpp \
+    tabledelegate.h \
+    treeviewmodel.h \
     websocketclient.h
 
 FORMS += \
     connectiondialog.ui \
     dialogservers.ui \
+    dialoguser.ui \
     mainwindow.ui
 
 # Default rules for deployment.
@@ -39,3 +51,5 @@ INCLUDEPATH += $(BOOST_INCLDUE)
 
 RESOURCES += \
     resurses.qrc
+
+DEFINES += IS_USE_QT_LIB

@@ -25,7 +25,8 @@ private slots:
     void on_toolButton_3_clicked();
 
     void on_btnPwdEdit_toggled(bool checked);
-    void on_btnCloseConnection_clicked();
+
+    void on_btnViewPwd_toggled(bool checked);
 
 public slots:
     void connectionChanged(bool state);

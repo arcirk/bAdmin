@@ -2,8 +2,21 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include "connectiondialog.h"
 #include "websocketclient.h"
+#include <QLabel>
+#include <QTreeWidgetItem>
+#include <QTableWidgetItem>
+#include <QToolButton>
+#include <QTimer>
+#include <QSystemTrayIcon>
+#include <QAction>
+#include <QMenu>
+#include <QCloseEvent>
+#include <QStandardItemModel>
+//#include "qjsontablemodel.h"
+//#include "qproxymodel.h"
+#include "shared_struct.hpp"
+#include "treeviewmodel.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -22,18 +35,49 @@ private slots:
 
     void on_mnuExit_triggered();
 
-private:
-    Ui::MainWindow *ui;
-    WebSocketClient * m_client;
+    void on_mnuDisconnect_triggered();
 
+    void on_toolButton_clicked();
+
+    void on_treeWidget_itemClicked(QTreeWidgetItem *item, int column);
+
+    void on_btnEdit_clicked();
+
+    void on_treeView_doubleClicked(const QModelIndex &index);
+
+private:
+    Ui::MainWindow *                                        ui;
+    WebSocketClient *                                       m_client;
+    QLabel *                                                infoBar;
+    QMap<arcirk::server::server_objects, TreeViewModel*>    m_models;
+    QMap<QString, QString>                                  m_colAliases;
+
+    void createModels();
+    void createColumnAliases();
     bool openConnectionDialog();
 
     void reconnect();
     void displayError(const QString& what, const QString& err);
     void connectionSuccess(); //при успешной авторизации
     void connectionChanged(bool state);
+    void formControl();
 
     void write_conf();
+
+    QTreeWidgetItem * addTreeNode(const QString &text, const QVariant &key, const QString &imagePath);
+    QTreeWidgetItem * findTreeItem(const QString& key);
+    QTreeWidgetItem * findTreeItem(const QString& key, QTreeWidgetItem * parent);
+    QModelIndex findInTable(QAbstractItemModel * model, const QString& value, int column, bool findData = true);
+
+    void tableSetModel(const QString& key);
+    void tableResetModel(arcirk::server::server_objects key, const QByteArray& resp = "");
+
+    void fillDefaultTree();
+
+    void get_online_users();
+
+    //
+    void update_icons(arcirk::server::server_objects key, TreeViewModel* model);
 
 signals:
     void setConnectionChanged(bool state);
@@ -41,6 +85,7 @@ signals:
 public slots:
     void openConnection();
     void closeConnection();
+    void serverResponse(const arcirk::server::server_response& message);
 
 };
 #endif // MAINWINDOW_H

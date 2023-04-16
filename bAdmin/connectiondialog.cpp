@@ -24,6 +24,9 @@ ConnectionDialog::ConnectionDialog(arcirk::client::client_conf& conf, QWidget *p
     }
     m_connectionState = false;
     formControl();
+    if(!conf_.hash.empty()){
+        ui->edtPass->setText("***");
+    }
     setWindowTitle("Подключение к серверу");
 }
 
@@ -81,6 +84,15 @@ void ConnectionDialog::on_btnPwdEdit_toggled(bool checked)
 {
     ui->btnViewPwd->setEnabled(checked);
     ui->edtPass->setEnabled(checked);
+    if(checked){
+        if(ui->edtPass->text() == "***"){
+            ui->edtPass->setText("");
+        }else{
+            if(ui->edtPass->text() != "***" && !conf_.hash.empty()){
+                ui->edtPass->setText("***");
+            }
+        }
+    }
 }
 
 void ConnectionDialog::formControl()
@@ -89,11 +101,6 @@ void ConnectionDialog::formControl()
     ui->edtUser->setEnabled(!m_connectionState);
     ui->chAutoConnect->setEnabled(!m_connectionState);
     ui->btnPwdEdit->setEnabled(!m_connectionState);
-    //ui->btnCloseConnection->setEnabled(m_connectionState);
-    if(m_connectionState)
-        ui->btnCloseConnection->setIcon(QIcon(":/img/disconnect.png"));
-    else
-        ui->btnCloseConnection->setIcon(QIcon(":/img/connect.png"));
 }
 
 QString ConnectionDialog::get_sha1(const QByteArray& p_arg){
@@ -124,19 +131,17 @@ void ConnectionDialog::connectionChanged(bool state)
     formControl();
 }
 
-void ConnectionDialog::on_btnCloseConnection_clicked()
+
+
+void ConnectionDialog::on_btnViewPwd_toggled(bool checked)
 {
-    if(m_connectionState){
-        emit closeConnection();
-    }else{
-        conf_.user_name = ui->edtUser->text().toStdString();
-        conf_.server_host = ui->comboBox->currentText().toStdString();
-        if(ui->btnPwdEdit->isChecked()){
-            auto hash = get_hash(ui->edtUser->text(), ui->edtPass->text());
-            conf_.hash = hash.toStdString();
-        }
-        conf_.is_auto_connect = ui->chAutoConnect->isChecked();
-        emit openConnection();
-    }
+    auto echoMode = checked ? QLineEdit::Normal : QLineEdit::Password;
+    QString image = checked ? ":/img/viewPwd.svg" : ":/img/viewPwd1.svg";
+    auto btn = dynamic_cast<QToolButton*>(sender());
+    btn->setIcon(QIcon(image));
+    ui->edtPass->setEchoMode(echoMode);
+//    if(ui->edtPass->text().isEmpty() && !conf_.hash.empty()){
+//        ui->edtPass->setText("***");
+//    }
 }
 

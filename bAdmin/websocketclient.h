@@ -22,6 +22,7 @@ public:
     ~WebSocketClient();
 
     static QString generateHash(const QString& usr, const QString& pwd);
+
     bool isStarted();
 
     client::client_conf& conf();
@@ -31,6 +32,10 @@ public:
     void open();
     void close();
     void write_conf();
+
+    void send_command(arcirk::server::server_commands cmd, const nlohmann::json& param = {});
+
+    nlohmann::json exec_http_query(const std::string& command, const nlohmann::json& param);
 
 private:
     client::client_conf conf_;
@@ -63,10 +68,15 @@ private:
     void doConnectionSuccess(); //при успешной авторизации
     void doConnectionChanged(bool state);
 
+    static QString get_hash(const QString& first, const QString& second);
+    static QString get_sha1(const QByteArray& p_arg);
+
 signals:
     void displayError(const QString& what, const QString& err);
     void connectionSuccess(); //при успешной авторизации
     void connectionChanged(bool state);
+    void serverResponse(const arcirk::server::server_response& message);
+
 private slots:
 
     void onConnected();

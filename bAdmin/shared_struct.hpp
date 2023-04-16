@@ -10,6 +10,7 @@
 #include <nlohmann/json.hpp>
 #include <pre/json/from_json.hpp>
 #include <pre/json/to_json.hpp>
+#include <vector>
 
 #define ARCIRK_VERSION "1.1.0"
 #define CONF_FILENAME "b_admin_conf.json"
@@ -131,6 +132,7 @@ namespace arcirk::server{
         GetInformationAboutFile,
         CheckForUpdates,
         UploadFile,
+        GetDatabaseTables,
         CMD_INVALID=-1,
     };
 
@@ -159,9 +161,60 @@ namespace arcirk::server{
          {GetInformationAboutFile, "GetInformationAboutFile"},
          {CheckForUpdates, "CheckForUpdates"},
          {UploadFile, "UploadFile"},
-    })
+         {GetDatabaseTables, "GetDatabaseTables"},
+    });
 
+    enum server_objects{
+        OnlineUsers,
+        Root,
+        Services,
+        Database,
+        DatabaseTables,
+        Devices,
+        DatabaseUsers,
+        OBJ_INVALID=-1,
+    };
+
+    NLOHMANN_JSON_SERIALIZE_ENUM(server_objects, {
+        {OBJ_INVALID, nullptr} ,
+        {OnlineUsers, "OnlineUsers"} ,
+        {Root, "Root"} ,
+        {Services, "Services"} ,
+        {Database, "Database"} ,
+        {DatabaseTables, "DatabaseTables"},
+        {Devices, "Devices"},
+        {DatabaseUsers, "DatabaseUsers"},
+    });
+
+    enum device_types{
+        devDesktop,
+        devServer,
+        devPhone,
+        devTablet,
+        devExtendedLib,
+        DEV_INVALID=-1,
+    };
+
+    NLOHMANN_JSON_SERIALIZE_ENUM(device_types, {
+       {DEV_INVALID, nullptr} ,
+       {devDesktop, "Desktop"} ,
+       {devServer, "Server"} ,
+       {devPhone, "Phone"} ,
+       {devTablet, "Tablet"} ,
+       {devExtendedLib, "ExtendedLib"},
+   });
 }
+
+BOOST_FUSION_DEFINE_STRUCT(
+        (arcirk::client), client_conf,
+        (std::string, app_name)
+        (bool, is_auto_connect)
+        (std::string, server_host)
+        (std::string, user_name)
+        (std::string, hash)
+        (std::string, device_id)
+        (ByteArray, servers)
+);
 
 BOOST_FUSION_DEFINE_STRUCT(
         (arcirk::server), server_config,
@@ -196,18 +249,24 @@ BOOST_FUSION_DEFINE_STRUCT(
         (bool, ResponseTransferToBase64)
         (bool, AllowDelayedAuthorization)
         (bool, AllowHistoryMessages)
+        (std::string, ExchangePlan)
         (std::string, ServerProtocol)
 );
 
 BOOST_FUSION_DEFINE_STRUCT(
-        (arcirk::client), client_conf,
-        (std::string, app_name)
-        (bool, is_auto_connect)
-        (std::string, server_host)
-        (std::string, user_name)
-        (std::string, hash)
-        (std::string, device_id)
-        (ByteArray, servers)
+    (arcirk::database), user_info,
+    (int, _id)
+    (std::string, first)
+    (std::string, second)
+    (std::string, ref)
+    (std::string, hash)
+    (std::string, role)
+    (std::string, performance)
+    (std::string, parent)
+    (std::string, cache)
+    (int, is_group)
+    (int, deletion_mark)
+    (int, version)
 );
 
 #define ARR_SIZE(x) (sizeof(x) / sizeof(x[0]))
