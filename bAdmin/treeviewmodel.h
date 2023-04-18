@@ -33,11 +33,12 @@ public:
     Qt::ItemFlags flags(const QModelIndex &index) const override;
     bool hasChildren(const QModelIndex &parent) const override;
 
-    void fetchRoot(const QString& table_name);
+    void fetchRoot(const QString& table_name, const QString& root_dir = "");
     QVariant firstData(const nlohmann::json& node, int role, const QModelIndex& index) const;
     bool is_loaded();
     void set_column_aliases(const QMap<QString, QString> values);
     int get_column_index(const QString& name);
+    QString get_column_name(int column) const;
     void set_columns(const QVector<QString> cols);
     void set_server_object(arcirk::server::server_objects obj);
     arcirk::server::server_objects server_object() const;
@@ -49,6 +50,12 @@ public:
     void reset();
 
     void set_table(const nlohmann::json& tableModel);
+
+    QString current_parent_path() const;
+
+    void refresh(const QModelIndex& parent);
+
+    void remove(const QModelIndex &parent);
 
 private:
     arcirk::server::server_objects server_object_;
@@ -62,6 +69,10 @@ private:
     QMap<QString, QString> column_aliases;
     bool is_loaded_;
 
+    QString current_parent_path_;
+
+    void set_current_parent_path(const QString& value);
+
     QMap<item_icons_enum, QIcon> item_icons;
     QIcon rows_icon;
     QMap<QPair<int,int>, QIcon> row_icons;
@@ -72,6 +83,7 @@ private:
     nlohmann::json getNodeData(const QString& parentUuid) const;
 
     QVariant get_value(const nlohmann::json &node, int col = 0) const;
+    nlohmann::json http_data(const QString &parentUuid) const;
 
 };
 

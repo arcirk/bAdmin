@@ -45,12 +45,19 @@ private slots:
 
     void on_treeView_doubleClicked(const QModelIndex &index);
 
+    void on_btnDataImport_clicked();
+
+    void on_btnAdd_clicked();
+
+    void on_btnDelete_clicked();
+
 private:
     Ui::MainWindow *                                        ui;
     WebSocketClient *                                       m_client;
     QLabel *                                                infoBar;
     QMap<arcirk::server::server_objects, TreeViewModel*>    m_models;
     QMap<QString, QString>                                  m_colAliases;
+    QMap<arcirk::server::application_names, QIcon>          app_icons;
 
     void createModels();
     void createColumnAliases();

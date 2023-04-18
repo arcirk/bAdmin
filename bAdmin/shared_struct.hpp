@@ -11,6 +11,11 @@
 #include <pre/json/from_json.hpp>
 #include <pre/json/to_json.hpp>
 #include <vector>
+#include <utility>
+#include <vector>
+#include <string>
+#include <fstream>
+#include <sstream>
 
 #define ARCIRK_VERSION "1.1.0"
 #define CONF_FILENAME "b_admin_conf.json"
@@ -53,6 +58,29 @@ namespace arcirk{
 
     inline ByteArray string_to_byte_array(const std::string& str){
         return ByteArray(str.begin(), str.end());
+    }
+    inline void write_file(const std::string& filename, ByteArray& file_bytes){
+        std::ofstream file(filename, std::ios::out|std::ios::binary);
+        std::copy(file_bytes.cbegin(), file_bytes.cend(),
+                  std::ostream_iterator<unsigned char>(file));
+    }
+
+    inline void read_file(const std::string &filename, ByteArray &result)
+    {
+
+        FILE * fp = fopen(filename.c_str(), "rb");
+
+        fseek(fp, 0, SEEK_END);
+        size_t flen= ftell(fp);
+        fseek(fp, 0, SEEK_SET);
+
+        std::vector<unsigned char> v (flen);
+
+        fread(&v[0], 1, flen, fp);
+
+        fclose(fp);
+
+        result = v;
     }
 }
 
@@ -133,6 +161,10 @@ namespace arcirk::server{
         CheckForUpdates,
         UploadFile,
         GetDatabaseTables,
+        ProfileDirFileList,
+        DownloadFile,
+        FileToDatabase,
+        ProfileDeleteFile,
         CMD_INVALID=-1,
     };
 
@@ -162,6 +194,10 @@ namespace arcirk::server{
          {CheckForUpdates, "CheckForUpdates"},
          {UploadFile, "UploadFile"},
          {GetDatabaseTables, "GetDatabaseTables"},
+         {ProfileDirFileList, "ProfileDirFileList"},
+         {DownloadFile, "DownloadFile"},
+         {FileToDatabase, "FileToDatabase"},
+         {ProfileDeleteFile, "ProfileDeleteFile"}    ,
     });
 
     enum server_objects{
@@ -172,6 +208,7 @@ namespace arcirk::server{
         DatabaseTables,
         Devices,
         DatabaseUsers,
+        ProfileDirectory,
         OBJ_INVALID=-1,
     };
 
@@ -184,6 +221,19 @@ namespace arcirk::server{
         {DatabaseTables, "DatabaseTables"},
         {Devices, "Devices"},
         {DatabaseUsers, "DatabaseUsers"},
+        {ProfileDirectory, "ProfileDirectory"},
+    });
+
+    enum application_names{
+        PriceChecker,
+        ServerManager,
+        APP_INVALID=-1,
+    };
+
+    NLOHMANN_JSON_SERIALIZE_ENUM(application_names, {
+        {APP_INVALID, nullptr} ,
+        {PriceChecker, "PriceChecker"} ,
+        {ServerManager, "ServerManager"} ,
     });
 
     enum device_types{

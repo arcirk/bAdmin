@@ -7,6 +7,8 @@
 #include "dialoguser.h"
 #include "connectiondialog.h"
 #include <QVector>
+#include <dialogprofilefolder.h>
+#include <QFileDialog>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -117,6 +119,10 @@ void MainWindow::formControl()
     infoBar = new QLabel(this);
     ui->statusbar->addWidget(infoBar);
     infoBar->setText("Готово");
+
+    app_icons.insert(arcirk::server::application_names::PriceChecker, QIcon(":/img/pricechecker.png"));
+    app_icons.insert(arcirk::server::application_names::ServerManager, QIcon(":/img/socket.ico"));
+
 }
 
 void MainWindow::write_conf()
@@ -157,6 +163,15 @@ void MainWindow::serverResponse(const arcirk::server::server_response &message)
             }
         }
 
+    }else if(message.command == arcirk::enum_synonym(arcirk::server::server_commands::ProfileDeleteFile)){
+        if(message.message == "OK"){
+            QMessageBox::information(this, "Удаление файла", "Файл успешно удален!");
+            auto model = (TreeViewModel*)ui->treeView->model();
+            model->clear();
+            model->fetchRoot("ProfileDirectory");
+        }else if(message.message == "error"){
+            QMessageBox::critical(this, "Удаление файла", "Ошибка удаения файла!");
+        }
     }
 }
 
@@ -248,6 +263,7 @@ void MainWindow::tableResetModel(server::server_objects key, const QByteArray& r
             auto json = QByteArray::fromBase64(resp);
             //qDebug() << qPrintable(json);
             m_models[OnlineUsers]->set_table(nlohmann::json::parse(json));
+            update_icons(OnlineUsers, m_models[OnlineUsers]);
             m_models[OnlineUsers]->reset();
         }
     }else if (key == Root){
@@ -332,11 +348,24 @@ void MainWindow::fillDefaultTree()
     item->addChild(tbl);
     tbl = addTreeNode("Пользователи", arcirk::enum_synonym(server::server_objects::DatabaseUsers).c_str(), ":/img/users1.png");
     item->addChild(tbl);
+    tbl = addTreeNode("Каталог профиля", arcirk::enum_synonym(server::server_objects::ProfileDirectory).c_str(), ":/img/users1.png");
+    root->addChild(tbl);
 }
 
 void MainWindow::on_toolButton_clicked()
 {
+    auto model = (TreeViewModel*)ui->treeView->model();
+    auto index = ui->treeView->currentIndex();
+    if(!index.isValid()){
+        QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
+        return;
+    }
 
+    using namespace arcirk::server;
+    using json = nlohmann::json;
+    if(model->server_object() == arcirk::server::ProfileDirectory){
+
+    }
 }
 
 void MainWindow::createModels()
@@ -349,7 +378,8 @@ void MainWindow::createModels()
         Database,
         DatabaseTables,
         Devices,
-        DatabaseUsers
+        DatabaseUsers,
+        ProfileDirectory
     };
 
     foreach (auto const& itr, vec) {
@@ -417,6 +447,7 @@ void MainWindow::createColumnAliases()
     m_colAliases.insert("workplace", "Рабочее место");
     m_colAliases.insert("device_type", "Тип устройства");
     m_colAliases.insert("is_group", "Это группа");
+    m_colAliases.insert("size", "Размер");
 }
 
 void MainWindow::on_treeWidget_itemClicked(QTreeWidgetItem *item, int column)
@@ -476,6 +507,23 @@ void MainWindow::on_treeWidget_itemClicked(QTreeWidgetItem *item, int column)
         ui->treeView->resizeColumnToContents(0);
 
 
+    }else if(key == QString(arcirk::enum_synonym(ProfileDirectory).data())){
+        if(m_client->isConnected()){
+            m_models[ProfileDirectory]->fetchRoot("ProfileDirectory");
+            ui->treeView->resizeColumnToContents(0);
+//            using json_nl = nlohmann::json;
+
+//            std::string uuid_form_ = arcirk::uuids::nil_string_uuid();
+
+//            json_nl param = {
+//                    {"table", true},
+//                    {"uuid_form", uuid_form_},
+//                    {"empty_column", false},
+//                    {"recursive", true}
+//            };
+
+//            m_client->send_command(arcirk::server::server_commands::ProfileDirFileList, param);
+        }
     }
 
 }
@@ -541,6 +589,22 @@ void MainWindow::update_icons(arcirk::server::server_objects key, TreeViewModel 
             }
         }
 
+    }else if(key == OnlineUsers){
+        using namespace arcirk::server;
+
+        int ind = model->get_column_index("app_name");
+        auto parent = QModelIndex();
+        if(ind == -1)
+            return;
+        for (int i = 0; i < model->rowCount(parent); ++i) {
+            json app = model->index(i, ind, parent).data(Qt::DisplayRole).toString().trimmed().toStdString();
+            auto type_app = app.get<application_names>();
+            if(type_app == PriceChecker){
+                model->set_icon(model->index(i,0,parent), app_icons[PriceChecker]);
+            }else if(type_app == ServerManager){
+                model->set_icon(model->index(i,0,parent), app_icons[ServerManager]);
+            }
+        }
     }
 }
 
@@ -622,6 +686,146 @@ void MainWindow::on_treeView_doubleClicked(const QModelIndex &index)
         dlg.setModal(true);
         dlg.exec();
 
+    }
+}
+
+
+void MainWindow::on_btnDataImport_clicked()
+{
+    auto model = (TreeViewModel*)ui->treeView->model();
+    auto index = ui->treeView->currentIndex();
+    if(!index.isValid()){
+        QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
+        return;
+    }
+
+    using namespace arcirk::server;
+
+    if(model->server_object() == arcirk::server::DatabaseTables){
+        auto model = new TreeViewModel(m_client->conf(), this);
+        model->set_column_aliases(m_colAliases);
+        model->set_server_object(arcirk::server::DatabaseTables);
+        model->fetchRoot("ProfileDirectory", "shared_files/files");
+        auto dlg = DialogProfileFolder(model, this);
+        dlg.setModal(true);
+        dlg.setWindowTitle("Выбор файла для импорта");
+        dlg.exec();
+
+        if(dlg.result() == QDialog::Accepted){
+            auto tableName = index.data().toString();
+            auto path = dlg.file_name();
+            if(QMessageBox::question(this, "Импорт файла", QString("Импортировать данные из файла в таблицу %1?").arg(tableName)) == QMessageBox::No)
+                return;
+            if(m_client->isConnected()){
+                auto param = nlohmann::json{
+                    {"file_name", path.toStdString()},
+                    {"table_name", tableName.toStdString()},
+                };
+                m_client->send_command(arcirk::server::server_commands::FileToDatabase, param);
+            }
+        }
+
+        delete model;
+    }
+}
+
+
+void MainWindow::on_btnAdd_clicked()
+{
+    auto model = (TreeViewModel*)ui->treeView->model();
+    auto index = ui->treeView->currentIndex();
+    if(!index.isValid()){
+        QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
+        return;
+    }
+
+    using namespace arcirk::server;
+    using json = nlohmann::json;
+
+    if(model->server_object() == arcirk::server::ProfileDirectory){
+
+        auto result = QFileDialog::getOpenFileName(this, "Выбрать файл на диске");
+        if(!result.isEmpty()){
+            ByteArray data{};
+            try {
+                arcirk::read_file(result.toStdString(), data);
+                if(data.size() > 0){
+                    auto destantion = model->current_parent_path();
+                    QUrl url(result);
+                    auto file_name = url.fileName();
+                    json param{
+                        {"destantion", destantion.toStdString()},
+                        {"file_name", file_name.toStdString()},
+                        {"data", data}
+                    };
+                    auto resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::DownloadFile), param);
+                        if(resp  == "success"){
+                            QMessageBox::information(this, "Копирование файла", "Файл успешно скопирован!");
+                            model->refresh(index);
+                        }
+                }
+
+            } catch (const std::exception& e) {
+                QMessageBox::critical(this, "Ошибка", e.what());
+                return;
+            }
+
+        }
+    }
+}
+
+
+void MainWindow::on_btnDelete_clicked()
+{
+    auto model = (TreeViewModel*)ui->treeView->model();
+    auto index = ui->treeView->currentIndex();
+    if(!index.isValid()){
+        QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
+        return;
+    }
+
+    using namespace arcirk::server;
+    using json = nlohmann::json;
+    if(model->server_object() == arcirk::server::ProfileDirectory){
+
+        int ind = model->get_column_index("path");
+        auto file_path = model->index(index.row(), ind, index.parent()).data().toString();
+        auto file_name = model->index(index.row(), 0, index.parent()).data().toString();
+        auto result = QMessageBox::question(this, "Удаление файла", QString("Удалить файл %1").arg(file_name));
+
+        if(result == QMessageBox::Yes){
+
+            model->remove(index);
+//            int rows = model->rowCount(index);
+//            qDebug() << rows;
+
+//            json param{
+//                {"file_name", file_path.toStdString()}
+//            };
+//            m_client->send_command(server_commands::ProfileDeleteFile, param);
+
+
+
+//            try {
+//                arcirk::read_file(result.toStdString(), data);
+//                if(data.size() > 0){
+//                    auto destantion = model->current_parent_path();
+//                    QUrl url(result);
+//                    auto file_name = url.fileName();
+//                    json param{
+//                        {"destantion", destantion.toStdString()},
+//                        {"file_name", file_name.toStdString()},
+//                        {"data", data}
+//                    };
+//                    auto resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::DownloadFile), param);
+//                }
+
+//            } catch (const std::exception& e) {
+//                QMessageBox::critical(this, "Ошибка", e.what());
+//                return;
+//            }
+
+        }
     }
 }
 

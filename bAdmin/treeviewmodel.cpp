@@ -11,6 +11,82 @@ QString TreeViewModel::cryptPass(const QString &source, const QString &key)
     return QString::fromStdString(result);
 }
 
+nlohmann::json TreeViewModel::http_data(const QString &parentUuid) const{
+
+    std::string uuid_form_ = arcirk::uuids::nil_string_uuid();
+
+    nlohmann::json param = {
+            {"table", true},
+            {"uuid_form", uuid_form_},
+            {"empty_column", false},
+            {"recursive", false},
+            {"parent", parentUuid.toStdString()}
+    };
+
+    auto http_param = arcirk::synchronize::http_param();
+    http_param.command = arcirk::enum_synonym(arcirk::server::server_commands::ProfileDirFileList);
+    http_param.param = QByteArray(param.dump().data()).toBase64().toStdString();
+
+    QEventLoop loop;
+    int httpStatus = 200;
+    QByteArray httpData;
+    QNetworkAccessManager httpService;
+
+    auto finished = [&loop, &httpStatus, &httpData](QNetworkReply* reply) -> void
+    {
+       QVariant status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+       if(status_code.isValid()){
+           httpStatus = status_code.toInt();
+           if(httpStatus != 200){
+                qCritical() << QDateTime::currentDateTime().toString("hh:mm:ss") << __FUNCTION__ << "Error: " << httpStatus << " " + reply->errorString() ;
+           }else
+           {
+               httpData = reply->readAll();
+           }
+       }
+       loop.quit();
+
+    };
+
+    loop.connect(&httpService, &QNetworkAccessManager::finished, finished);
+
+    QUrl ws(conf_.server_host.data());
+    QString protocol = ws.scheme() == "wss" ? "https://" : "http://";
+    QString http_query = "/api/info";
+    QUrl url(protocol + ws.host() + ":" + QString::number(ws.port()) + http_query);
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    QString headerData = "Token " + authString_;
+    request.setRawHeader("Authorization", headerData.toLocal8Bit());
+
+//    auto bt = arcirk::string_to_byte_array(pre::json::to_json(http_param).dump());
+//    QByteArray* q_data = new QByteArray(reinterpret_cast<const char*>(bt.data()), bt.size());
+    httpService.post(request, QByteArray::fromStdString(pre::json::to_json(http_param).dump()));
+    //httpService.post(request, *q_data);
+    loop.exec();
+
+    if(httpStatus != 200){
+        return {};
+    }
+
+    if(httpData.isEmpty())
+        return {};
+
+    if(httpData == "error"){
+        return {};
+    }
+
+    auto msg = pre::json::from_json<arcirk::server::server_response>(httpData.toStdString());
+
+    if(msg.result.empty())
+        return {};
+
+    auto http_result = nlohmann::json::parse(QByteArray::fromBase64(msg.result.data()).toStdString());
+
+    return http_result;
+}
+
 nlohmann::json TreeViewModel::getNodeData(const QString &parentUuid) const
 {
     if(table_name_.isEmpty())
@@ -67,7 +143,11 @@ nlohmann::json TreeViewModel::getNodeData(const QString &parentUuid) const
     QString headerData = "Token " + authString_;
     request.setRawHeader("Authorization", headerData.toLocal8Bit());
 
+//    auto bt = arcirk::string_to_byte_array(pre::json::to_json(http_param).dump());
+//    QByteArray* q_data = new QByteArray(reinterpret_cast<const char*>(bt.data()), bt.size());
     httpService.post(request, QByteArray::fromStdString(pre::json::to_json(http_param).dump()));
+    //httpService.post(request, *q_data);
+    //httpService.post(request, QByteArray::fromStdString(pre::json::to_json(http_param).dump()));
     loop.exec();
 
     if(httpStatus != 200){
@@ -206,7 +286,7 @@ QHash<int, QByteArray> TreeViewModel::roleNames() const
 
 int TreeViewModel::findRow(const NodeInfo *nodeInfo) const
 {
-    Q_ASSERT(nodeInfo != 0);
+    Q_ASSERT(nodeInfo != 0);      
     const NodeInfoList& parentInfoChildren = nodeInfo->parent != 0 ? nodeInfo->parent->children: _nodes;
     NodeInfoList::const_iterator position = std::find(parentInfoChildren.constBegin(), parentInfoChildren.end(),  *nodeInfo);// qFind(parentInfoChildren, *nodeInfo);
     Q_ASSERT(position != parentInfoChildren.end());
@@ -261,7 +341,26 @@ QVariant TreeViewModel::data(const QModelIndex &index, int role) const
                 if(val.is_string())
                     return QString::fromStdString(val.get<std::string>());
                 else if(val.is_number_integer())
-                    return val.get<int>();
+                    if(columns[index.column()] != "size")
+                        return val.get<int>();
+                    else{
+                        if(table_name_ != "ProfileDirectory")
+                            return val.get<int>();
+                        else{
+                            auto val_i = val.get<int>();
+                            if(val_i > 1000)
+                                return val.get<int>() / 1000;
+                            else{
+                                if(val.get<int>() > 0){
+                                    double value = (double)val.get<int>() / (double)1000;
+                                    double exp = 100.0;
+                                    double result = std::trunc(value * exp) / exp;
+                                    return result;
+                                }else
+                                    return QVariant();
+                            }
+                        }
+                    }
                 else if(val.is_number_float())
                     return val.get<double>();
             }
@@ -364,7 +463,16 @@ void TreeViewModel::fetchMore(const QModelIndex &parent)
     if(table_name_.isEmpty())
         return;
 
-    auto http_result = getNodeData(row["ref"].get<std::string>().c_str());
+//    auto http_result = getNodeData(row["ref"].get<std::string>().c_str());
+
+    nlohmann::json http_result{};
+    if(table_name_ != "ProfileDirectory"){
+        http_result = getNodeData(row["ref"].get<std::string>().c_str());
+        set_current_parent_path(row["ref"].get<std::string>().c_str());
+    }else{
+        http_result = http_data(row["path"].get<std::string>().c_str());
+        set_current_parent_path(row["path"].get<std::string>().c_str());
+    }
 
     if(http_result.is_object()){
 
@@ -419,7 +527,77 @@ void TreeViewModel::set_table(const nlohmann::json& tableModel){
     is_loaded_ = true;
 }
 
-void TreeViewModel::fetchRoot(const QString& table_name)
+QString TreeViewModel::current_parent_path() const
+{
+    return current_parent_path_;
+}
+
+void TreeViewModel::refresh(const QModelIndex& parent)
+{
+    NodeInfo* parentInfo = static_cast<NodeInfo*>(parent.internalPointer());
+    parentInfo->children.erase(parentInfo->children.cbegin(), parentInfo->children.cend());
+    reset();
+//    if (parent.model()->hasChildren())
+//        parent.model()->removeRows(0,parent.model()->rowCount());
+    //    fetchMore(parent);
+}
+
+void TreeViewModel::remove(const QModelIndex &index)
+{
+    if(!index.isValid())
+        return;
+
+    NodeInfo* itemInfo = static_cast<NodeInfo*>(index.internalPointer());
+    NodeInfo* parentInfo = itemInfo->parent;
+    auto pos = findRow(itemInfo);
+    int rows = rowCount(index.parent());
+
+//    if (pos >= rows)
+//        return;
+
+//    int beginRow = qMax(0, pos);
+//    int endRow = qMin(pos - 1, rows - 1);
+
+//    beginRemoveRows(index.parent(), beginRow, endRow);
+
+
+//    removeRow(pos, index.parent());
+
+//    if(rows - 1 >= pos ){
+//        beginRemoveRows(index.parent(), pos, pos);
+//    }
+    if (parentInfo != 0) {
+        beginRemoveRows(index.parent(), pos, pos);
+        parentInfo->children.remove(pos);
+        endRemoveRows();
+    }else{
+        beginRemoveRows(index.parent(), pos, pos);
+        _nodes.remove(pos);
+        endRemoveRows();
+    }
+
+    //endRemoveRows();
+
+    //removeRows(pos, pos, index.parent());
+
+
+    //removeRow(pos, index.parent());
+    //reset();
+//    int rows = rowCount(index);
+
+//    if(rows == 0){
+
+//    }else{
+
+//    }
+}
+
+void TreeViewModel::set_current_parent_path(const QString &value)
+{
+    current_parent_path_ = value;
+}
+
+void TreeViewModel::fetchRoot(const QString& table_name, const QString& root_dir)
 {
     if(table_name == table_name_ && is_loaded_)
         return;
@@ -427,15 +605,21 @@ void TreeViewModel::fetchRoot(const QString& table_name)
     clear();
 
     table_name_ = table_name;
+    current_parent_path_ = root_dir;
 
-    auto http_result = getNodeData("00000000-0000-0000-0000-000000000000");
-
+    nlohmann::json http_result{};
+    if(table_name_ != "ProfileDirectory"){
+        http_result = getNodeData("00000000-0000-0000-0000-000000000000");
+    }else{
+        http_result = http_data(root_dir);
+    }
     if(http_result.is_object()){
         columns.clear();
         auto cols = http_result["columns"];
         if(cols.is_array()){
             for (auto itr = cols.begin(); itr != cols.end(); ++itr) {
-                columns.push_back(QString::fromStdString(*itr));
+                std::string name = *itr;
+                columns.push_back(QString::fromStdString(name));
             }
         }
         beginResetModel();
@@ -453,7 +637,6 @@ void TreeViewModel::fetchRoot(const QString& table_name)
         endResetModel();
         is_loaded_ = true;
     }
-
 }
 
 QVariant TreeViewModel::firstData(const nlohmann::json &node, int role, const QModelIndex& index) const
@@ -548,6 +731,15 @@ int TreeViewModel::get_column_index(const QString &name)
     }
 
     return -1;
+}
+
+QString TreeViewModel::get_column_name(int column) const
+{
+
+    if(column < columns.size())
+        return columns[column];
+
+    return {};
 }
 
 void TreeViewModel::set_columns(const QVector<QString> cols)

@@ -11,6 +11,8 @@ CONFIG += c++17
 
 SOURCES += \
     connectiondialog.cpp \
+    dialogimporttodatabase.cpp \
+    dialogprofilefolder.cpp \
     dialogservers.cpp \
     dialoguser.cpp \
     main.cpp \
@@ -23,6 +25,8 @@ SOURCES += \
 
 HEADERS += \
     connectiondialog.h \
+    dialogimporttodatabase.h \
+    dialogprofilefolder.h \
     dialogservers.h \
     dialoguser.h \
     mainwindow.h \
@@ -36,6 +40,8 @@ HEADERS += \
 
 FORMS += \
     connectiondialog.ui \
+    dialogimporttodatabase.ui \
+    dialogprofilefolder.ui \
     dialogservers.ui \
     dialoguser.ui \
     mainwindow.ui
