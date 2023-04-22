@@ -9,6 +9,8 @@
 #include <QVector>
 #include <dialogprofilefolder.h>
 #include <QFileDialog>
+#include <dialogdevice.h>
+#include <dialogselectinlist.h>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -38,7 +40,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     createModels();
 
-    setWindowTitle("arcirk");
+    setWindowTitle("Менеджер сервера");
 }
 
 MainWindow::~MainWindow()
@@ -120,8 +122,8 @@ void MainWindow::formControl()
     ui->statusbar->addWidget(infoBar);
     infoBar->setText("Готово");
 
-    app_icons.insert(arcirk::server::application_names::PriceChecker, QIcon(":/img/pricechecker.png"));
-    app_icons.insert(arcirk::server::application_names::ServerManager, QIcon(":/img/socket.ico"));
+    app_icons.insert(arcirk::server::application_names::PriceChecker, qMakePair(QIcon(":/img/pricechecker.png"), QIcon(":/img/pricechecker.png")));
+    app_icons.insert(arcirk::server::application_names::ServerManager, qMakePair(QIcon(":/img/socket.ico"), QIcon(":/img/socket.ico")));
 
 }
 
@@ -245,8 +247,7 @@ void MainWindow::tableSetModel(const QString &key)
     auto table = ui->treeView;
     table->setModel(nullptr);
     table->setModel(model);
-//    model->reset();
-//    table->resizeColumnsToContents();
+    table->resizeColumnToContents(0);
 
 }
 
@@ -272,13 +273,11 @@ void MainWindow::tableResetModel(server::server_objects key, const QByteArray& r
         if(srv_conf.is_object()){
             auto items = srv_conf.items();
             auto columns = nlohmann::json::array();
-            //columns += "empty";
             columns += "Параметр";
             columns += "Значение";
             auto rows = nlohmann::json::array();
             for (auto itr = items.begin(); itr != items.end(); ++itr) {
                 auto row = nlohmann::json::object();
-                //row["empty"] = " ";
                 row["Параметр"] = itr.key();
                 row["Значение"] = itr.value();
                 rows += row;
@@ -295,12 +294,10 @@ void MainWindow::tableResetModel(server::server_objects key, const QByteArray& r
         auto tbls = nlohmann::json::parse(QByteArray::fromBase64(resp).toStdString());
         if(tbls.is_array()){
             auto columns = nlohmann::json::array();
-            //columns += "empty";
             columns += "Таблица";
             auto rows = nlohmann::json::array();
             for (auto itr = tbls.begin(); itr != tbls.end(); ++itr) {
                 auto row = nlohmann::json::object();
-                //row["empty"] = " ";
                 row["Таблица"] = *itr;
                 rows += row;
             }
@@ -510,6 +507,12 @@ void MainWindow::on_treeWidget_itemClicked(QTreeWidgetItem *item, int column)
     }else if(key == QString(arcirk::enum_synonym(ProfileDirectory).data())){
         if(m_client->isConnected()){
             m_models[ProfileDirectory]->fetchRoot("ProfileDirectory");
+            QVector<QString> m_hide{"path", "parent", "is_group"};
+            foreach (auto const& itr, m_hide) {
+                auto index = m_models[ProfileDirectory]->get_column_index(itr);
+                if(index != -1)
+                    ui->treeView->hideColumn(index);
+            }
             ui->treeView->resizeColumnToContents(0);
 //            using json_nl = nlohmann::json;
 
@@ -600,9 +603,9 @@ void MainWindow::update_icons(arcirk::server::server_objects key, TreeViewModel 
             json app = model->index(i, ind, parent).data(Qt::DisplayRole).toString().trimmed().toStdString();
             auto type_app = app.get<application_names>();
             if(type_app == PriceChecker){
-                model->set_icon(model->index(i,0,parent), app_icons[PriceChecker]);
+                model->set_icon(model->index(i,0,parent), app_icons[PriceChecker].first);
             }else if(type_app == ServerManager){
-                model->set_icon(model->index(i,0,parent), app_icons[ServerManager]);
+                model->set_icon(model->index(i,0,parent), app_icons[ServerManager].first);
             }
         }
     }
@@ -618,7 +621,7 @@ QModelIndex MainWindow::findInTable(QAbstractItemModel * model, const QString &v
             if(value == index.data(Qt::UserRole + 1).toString())
                 return index;
         }else{
-            QString data = index.data(Qt::UserRole + column).toString();
+            QString data = index.data().toString();
             if(value == data)
                 return index;
         }
@@ -641,6 +644,8 @@ void MainWindow::on_treeView_doubleClicked(const QModelIndex &index)
     }
 
     auto model = (TreeViewModel*)ui->treeView->model();
+    using namespace arcirk::database;
+    using json = nlohmann::json;
 
     if(model->server_object() == arcirk::server::DatabaseUsers){
         auto object = model->get_object(index);
@@ -648,7 +653,7 @@ void MainWindow::on_treeView_doubleClicked(const QModelIndex &index)
             //QMessageBox::critical(this, "Ошибка", "Редактирование групп запрещено!");
             return;
         }
-        using namespace arcirk::database;
+
         auto query = builder::query_builder();
 
         std::string query_text = query.select().from("Users").where(nlohmann::json{
@@ -686,6 +691,46 @@ void MainWindow::on_treeView_doubleClicked(const QModelIndex &index)
         dlg.setModal(true);
         dlg.exec();
 
+        if(dlg.result() == QDialog::Accepted){
+
+        }
+
+    }else if(model->server_object() == arcirk::server::Devices){
+        using namespace arcirk::server;
+        auto ref = model->data(model->index(index.row(), model->get_column_index("ref"), index.parent()), Qt::DisplayRole).toString();
+        json param{
+            {"device", ref.toStdString()}
+        };
+        //m_client->send_command(server_commands::DeviceGetFullInfo, param);
+        auto resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::DeviceGetFullInfo), param);
+        if(resp.is_object()){
+            auto dlg = DialogDevice(resp, this);
+            dlg.setModal(true);
+            dlg.exec();
+
+            if(dlg.result() == QDialog::Accepted){
+                auto dev = dlg.get_result();
+                nlohmann::json query_param = {
+                    {"table_name", "Devices"},
+                    {"query_type", "update"},
+                    {"values", pre::json::to_json(dev)},
+                    {"where_values", nlohmann::json({
+                         {"ref", ref.toStdString()}
+                     })}
+                };
+
+                std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+                resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::ExecuteSqlQuery), json{
+                                                     {"query_param", base64_param}
+                                                 });
+                if(resp.is_string()){
+                    if(resp.get<std::string>() == "success"){
+                        model->set_object(index ,pre::json::to_json(dlg.get_view_result()));
+                        update_icons(server_objects::Devices, model);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -759,9 +804,12 @@ void MainWindow::on_btnAdd_clicked()
                         {"data", data}
                     };
                     auto resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::DownloadFile), param);
-                        if(resp  == "success"){
-                            QMessageBox::information(this, "Копирование файла", "Файл успешно скопирован!");
-                            model->refresh(index);
+                        if(resp  != "error"){
+                            int is_folder = model->index(index.row(), model->get_column_index("is_group"), index.parent()).data().toInt();
+                            if(is_folder == 0)
+                                model->add(resp,  index.parent());
+                            else
+                                model->add(resp, index);
                         }
                 }
 
@@ -794,36 +842,44 @@ void MainWindow::on_btnDelete_clicked()
         auto result = QMessageBox::question(this, "Удаление файла", QString("Удалить файл %1").arg(file_name));
 
         if(result == QMessageBox::Yes){
+            json param{
+                {"file_name", file_path.toStdString()}
+            };
+            auto command = arcirk::enum_synonym(arcirk::server::server_commands::ProfileDeleteFile);
+            auto resp = m_client->exec_http_query(command, param);
+            if(resp.get<std::string>() == "success")
+                model->remove(index);
 
-            model->remove(index);
-//            int rows = model->rowCount(index);
-//            qDebug() << rows;
-
-//            json param{
-//                {"file_name", file_path.toStdString()}
-//            };
-//            m_client->send_command(server_commands::ProfileDeleteFile, param);
+        }
+    }
+}
 
 
-
-//            try {
-//                arcirk::read_file(result.toStdString(), data);
-//                if(data.size() > 0){
-//                    auto destantion = model->current_parent_path();
-//                    QUrl url(result);
-//                    auto file_name = url.fileName();
-//                    json param{
-//                        {"destantion", destantion.toStdString()},
-//                        {"file_name", file_name.toStdString()},
-//                        {"data", data}
-//                    };
-//                    auto resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::DownloadFile), param);
-//                }
-
-//            } catch (const std::exception& e) {
-//                QMessageBox::critical(this, "Ошибка", e.what());
-//                return;
-//            }
+void MainWindow::on_btnSetLinkDevice_clicked()
+{
+    auto model = (TreeViewModel*)ui->treeView->model();
+    auto index = ui->treeView->currentIndex();
+    if(!index.isValid()){
+        QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
+        return;
+    }
+    using namespace arcirk::server;
+    using json = nlohmann::json;
+    if(model->server_object() == arcirk::server::OnlineUsers){
+        auto dlg = DialogSelectInList(m_models[Devices], "Выбор устройства", this);
+        dlg.setModal(true);
+        dlg.exec();
+        if(dlg.result() == QDialog::Accepted){
+            auto res = dlg.dialogResult();
+            auto ind = m_models[Devices]->get_column_index("ref");
+            auto indUuid = model->get_column_index("session_uuid");
+            auto ref = res[ind];
+            auto uuid = model->data(model->index(index.row(), indUuid, index.parent()), Qt::DisplayRole).toString();
+            json param{
+                {"remote_session", uuid.toStdString()},
+                {"device_id", ref.toStdString()}
+            };
+            m_client->send_command(arcirk::server::server_commands::SetNewDeviceId, param);
 
         }
     }

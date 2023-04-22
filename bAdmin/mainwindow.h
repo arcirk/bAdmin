@@ -51,13 +51,15 @@ private slots:
 
     void on_btnDelete_clicked();
 
+    void on_btnSetLinkDevice_clicked();
+
 private:
     Ui::MainWindow *                                        ui;
     WebSocketClient *                                       m_client;
     QLabel *                                                infoBar;
     QMap<arcirk::server::server_objects, TreeViewModel*>    m_models;
     QMap<QString, QString>                                  m_colAliases;
-    QMap<arcirk::server::application_names, QIcon>          app_icons;
+    QMap<arcirk::server::application_names, QPair<QIcon, QIcon>> app_icons;
 
     void createModels();
     void createColumnAliases();

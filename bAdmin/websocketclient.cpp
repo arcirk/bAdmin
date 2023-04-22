@@ -217,7 +217,7 @@ void WebSocketClient::doConnectionChanged(bool state)
 nlohmann::json WebSocketClient::exec_http_query(const std::string &command, const nlohmann::json &param, const QByteArray& btt)
 {
     auto http_param = arcirk::synchronize::http_param();
-    http_param.command = arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery);
+    http_param.command = command;
     http_param.param = QByteArray(param.dump().data()).toBase64().toStdString();
 
     QEventLoop loop;

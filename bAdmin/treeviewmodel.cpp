@@ -322,6 +322,11 @@ int TreeViewModel::columnCount(const QModelIndex &parent) const
     return columns.size();
 }
 
+bool TreeViewModel::field_is_exists(const nlohmann::json &object, const std::string &name) const {
+    auto itr = object.find(name);
+    return itr != object.end();
+}
+
 QVariant TreeViewModel::data(const QModelIndex &index, int role) const
 {
     if (!index.isValid()) {
@@ -337,6 +342,8 @@ QVariant TreeViewModel::data(const QModelIndex &index, int role) const
             return firstData(rowData, role, index);
         else{
             if (role == Qt::DisplayRole) {
+                if(!field_is_exists(rowData, columns[index.column()].toStdString()))
+                    return QVariant();
                 auto val = rowData[columns[index.column()].toStdString()];
                 if(val.is_string())
                     return QString::fromStdString(val.get<std::string>());
@@ -424,7 +431,6 @@ bool TreeViewModel::setData(const QModelIndex &index, const QVariant &value, int
 
 QVariant TreeViewModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
-    //const QStringList headers = {"Имя", "Дата изменения", "Размер", "Тип"};
     if (orientation == Qt::Horizontal && role == Qt::DisplayRole && section < columns.size()) {
         auto name = QString::fromStdString(columns[section].toStdString());
         auto itr = column_aliases.find(name);
@@ -515,7 +521,6 @@ void TreeViewModel::set_table(const nlohmann::json& tableModel){
     beginResetModel();
     auto rows = tableModel["rows"];
     if(rows.is_array()){
-        //std::copy(rows.begin(), rows.end(), std::back_inserter(_nodes));
         for(auto entry = rows.begin(); entry != rows.end(); ++entry) {
             nlohmann::json e = *entry;
             NodeInfo nodeInfo(e);
@@ -534,12 +539,12 @@ QString TreeViewModel::current_parent_path() const
 
 void TreeViewModel::refresh(const QModelIndex& parent)
 {
-    NodeInfo* parentInfo = static_cast<NodeInfo*>(parent.internalPointer());
-    parentInfo->children.erase(parentInfo->children.cbegin(), parentInfo->children.cend());
-    reset();
-//    if (parent.model()->hasChildren())
-//        parent.model()->removeRows(0,parent.model()->rowCount());
-    //    fetchMore(parent);
+//    NodeInfo* parentInfo = static_cast<NodeInfo*>(parent.internalPointer());
+//    parentInfo->children.erase(parentInfo->children.cbegin(), parentInfo->children.cend());
+//    reset();
+////    if (parent.model()->hasChildren())
+////        parent.model()->removeRows(0,parent.model()->rowCount());
+//    //    fetchMore(parent);
 }
 
 void TreeViewModel::remove(const QModelIndex &index)
@@ -550,22 +555,7 @@ void TreeViewModel::remove(const QModelIndex &index)
     NodeInfo* itemInfo = static_cast<NodeInfo*>(index.internalPointer());
     NodeInfo* parentInfo = itemInfo->parent;
     auto pos = findRow(itemInfo);
-    int rows = rowCount(index.parent());
 
-//    if (pos >= rows)
-//        return;
-
-//    int beginRow = qMax(0, pos);
-//    int endRow = qMin(pos - 1, rows - 1);
-
-//    beginRemoveRows(index.parent(), beginRow, endRow);
-
-
-//    removeRow(pos, index.parent());
-
-//    if(rows - 1 >= pos ){
-//        beginRemoveRows(index.parent(), pos, pos);
-//    }
     if (parentInfo != 0) {
         beginRemoveRows(index.parent(), pos, pos);
         parentInfo->children.remove(pos);
@@ -575,21 +565,38 @@ void TreeViewModel::remove(const QModelIndex &index)
         _nodes.remove(pos);
         endRemoveRows();
     }
+}
 
-    //endRemoveRows();
+void TreeViewModel::add(const nlohmann::json object, const QModelIndex &parent)
+{
+    NodeInfo* parentInfo = static_cast<NodeInfo*>(parent.internalPointer());
+    int insrtCnt = parentInfo->children.size() - 1;
+    if (insrtCnt < 0) {
+        insrtCnt = 0;
+    }
+    beginInsertRows(parent, 0, insrtCnt);
+    NodeInfo nodeInfo(object, parentInfo);
+    nodeInfo.mapped = object["is_group"] != 1;
+    parentInfo->children.push_back(std::move(nodeInfo));
+    endInsertRows();
+}
 
-    //removeRows(pos, pos, index.parent());
+void TreeViewModel::set_object(const QModelIndex &index, const nlohmann::json &object)
+{
 
+    if(!index.isValid())
+        return;
+    NodeInfo* nodeInfo = static_cast<NodeInfo*>(index.internalPointer());
+    Q_ASSERT(nodeInfo != 0);
+    nodeInfo->rowData = object;
+    emit dataChanged(index, index.sibling(index.row(), columns.size()));
 
-    //removeRow(pos, index.parent());
-    //reset();
-//    int rows = rowCount(index);
-
-//    if(rows == 0){
-
-//    }else{
-
-//    }
+//    if(row < 0 || parentInfo->children.size() - 1 < row)
+//        return;
+    //NodeInfo nodeInfo(object, parentInfo);
+    //beginResetModel();
+//    nodeInfo->rowData = object;// std::move(nodeInfo);
+    //endResetModel();
 }
 
 void TreeViewModel::set_current_parent_path(const QString &value)

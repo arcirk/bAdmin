@@ -56,6 +56,8 @@ public:
     void refresh(const QModelIndex& parent);
 
     void remove(const QModelIndex &parent);
+    void add(const nlohmann::json object, const QModelIndex &parent);
+    void set_object(const QModelIndex &index, const nlohmann::json& object);
 
 private:
     arcirk::server::server_objects server_object_;
@@ -84,6 +86,7 @@ private:
 
     QVariant get_value(const nlohmann::json &node, int col = 0) const;
     nlohmann::json http_data(const QString &parentUuid) const;
+    bool field_is_exists(const nlohmann::json &object, const std::string &name) const;
 
 };
 

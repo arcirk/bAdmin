@@ -10,7 +10,9 @@ CONFIG += c++17
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    dialogselectinlist.cpp \
     connectiondialog.cpp \
+    dialogdevice.cpp \
     dialogimporttodatabase.cpp \
     dialogprofilefolder.cpp \
     dialogservers.cpp \
@@ -24,7 +26,9 @@ SOURCES += \
     websocketclient.cpp
 
 HEADERS += \
+    dialogselectinlist.h \
     connectiondialog.h \
+    dialogdevice.h \
     dialogimporttodatabase.h \
     dialogprofilefolder.h \
     dialogservers.h \
@@ -39,7 +43,9 @@ HEADERS += \
     websocketclient.h
 
 FORMS += \
+    dialogselectinlist.ui \
     connectiondialog.ui \
+    dialogdevice.ui \
     dialogimporttodatabase.ui \
     dialogprofilefolder.ui \
     dialogservers.ui \

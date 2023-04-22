@@ -165,6 +165,7 @@ namespace arcirk::server{
         DownloadFile,
         FileToDatabase,
         ProfileDeleteFile,
+        DeviceGetFullInfo,
         CMD_INVALID=-1,
     };
 
@@ -198,6 +199,7 @@ namespace arcirk::server{
          {DownloadFile, "DownloadFile"},
          {FileToDatabase, "FileToDatabase"},
          {ProfileDeleteFile, "ProfileDeleteFile"}    ,
+         {DeviceGetFullInfo, "DeviceGetFullInfo"}    ,
     });
 
     enum server_objects{
@@ -318,6 +320,234 @@ BOOST_FUSION_DEFINE_STRUCT(
     (int, deletion_mark)
     (int, version)
 );
+
+BOOST_FUSION_DEFINE_STRUCT(
+                (arcirk::database), messages,
+                (int, _id)
+                (std::string, first)
+                (std::string, second)
+                (std::string, ref)
+                (std::string, message)
+                (std::string, token)
+                (int, date)
+                (std::string, content_type)
+                (int, unread_messages)
+                (std::string, parent)
+                (int, is_group)
+                (int, deletion_mark)
+                (int, version)
+);
+
+BOOST_FUSION_DEFINE_STRUCT(
+                (arcirk::database), organizations,
+                (int, _id)
+                (std::string, first)
+                (std::string, second)
+                (std::string, ref)
+                (std::string, cache)
+                (std::string, parent)
+                (int, is_group)
+                (int, deletion_mark)
+                (int, version)
+);
+
+BOOST_FUSION_DEFINE_STRUCT(
+                (arcirk::database), subdivisions,
+                (int, _id)
+                (std::string, first)
+                (std::string, second)
+                (std::string, ref)
+                (std::string, cache)
+                (std::string, parent)
+                (int, is_group)
+                (int, deletion_mark)
+                (int, version)
+);
+
+BOOST_FUSION_DEFINE_STRUCT(
+                (arcirk::database), warehouses,
+                (int, _id)
+                (std::string, first)
+                (std::string, second)
+                (std::string, ref)
+                (std::string, cache)
+                (std::string, parent)
+                (int, is_group)
+                (int, deletion_mark)
+                (int, version)
+);
+
+BOOST_FUSION_DEFINE_STRUCT(
+                (arcirk::database), price_types,
+                (int, _id)
+                (std::string, first)
+                (std::string, second)
+                (std::string, ref)
+                (std::string, cache)
+                (std::string, parent)
+                (int, is_group)
+                (int, deletion_mark)
+                (int, version)
+);
+
+BOOST_FUSION_DEFINE_STRUCT(
+                (arcirk::database), workplaces,
+                (int, _id)
+                (std::string, first)
+                (std::string, second)
+                (std::string, ref)
+                (std::string, cache)
+                (std::string, server)
+                (std::string, parent)
+                (int, is_group)
+                (int, deletion_mark)
+                (int, version)
+);
+
+BOOST_FUSION_DEFINE_STRUCT(
+                (arcirk::database), devices,
+                (int, _id)
+                (std::string, first)
+                (std::string, second)
+                (std::string, ref)
+                (std::string, cache)
+                (std::string, deviceType)
+                (std::string, address)
+                (std::string, workplace)
+                (std::string, price_type)
+                (std::string, warehouse)
+                (std::string, subdivision)
+                (std::string, organization)
+                (std::string, parent)
+                (int, is_group)
+                (int, deletion_mark)
+                (int, version)
+);
+
+BOOST_FUSION_DEFINE_STRUCT(
+                (arcirk::database), devices_view,
+                (std::string, ref)
+                (std::string, first)
+                (std::string, second)
+                (std::string, device_type)
+                (std::string, workplace)
+                (std::string, price)
+                (std::string, warehouse)
+                (std::string, subdivision)
+                (std::string, organization)
+);
+
+BOOST_FUSION_DEFINE_STRUCT(
+                (arcirk::database), documents,
+                (int, _id)
+                (std::string, first)
+                (std::string, second)
+                (std::string, ref)
+                (std::string, cache)
+                (std::string, number)
+                (int, date)
+                (std::string, xml_type)
+                (int, version)
+                (std::string, device_id)
+                (std::string, workplace)
+                (std::string, parent)
+                (int, is_group)
+                (int, deletion_mark)
+);
+
+BOOST_FUSION_DEFINE_STRUCT(
+                (arcirk::database), document_table,
+                (int, _id)
+                (std::string, first)
+                (std::string, second)
+                (std::string, ref)
+                (std::string, cache)
+                (double, price)
+                (double, quantity)
+                (std::string, barcode)
+                (std::string, product)
+                (std::string, parent)
+                (int, is_group)
+                (int, deletion_mark)
+                (int, version)
+);
+
+BOOST_FUSION_DEFINE_STRUCT(
+                (arcirk::database), nomenclature,
+                (int, _id)
+                (std::string, first) // Наименование
+                (std::string, second)
+                (std::string, ref)
+                (std::string, cache) // Все остальные реквизиты
+                (std::string, parent)
+                (std::string, vendor_code)
+                (std::string, trademark)
+                (std::string, unit)
+                (int, is_group)
+                (int, deletion_mark)
+                (int, version)
+);
+
+BOOST_FUSION_DEFINE_STRUCT(
+                (arcirk::database), barcodes,
+                (int, _id)
+                (std::string, first)
+                (std::string, second)
+                (std::string, ref)
+                (std::string, barcode)
+                (std::string, parent)
+                (int, is_group)
+                (int, deletion_mark)
+                (int, version)
+);
+
+BOOST_FUSION_DEFINE_STRUCT(
+                (arcirk::database), table_info_sqlite,
+                (int, cid)
+                (std::string, name)
+                (std::string, type)
+                (int, notnull)
+                (std::string, dflt_value)
+                (int, bk)
+);
+
+namespace arcirk::database {
+    enum tables{
+        tbUsers,
+        tbMessages,
+        tbOrganizations,
+        tbSubdivisions,
+        tbWarehouses,
+        tbPriceTypes,
+        tbWorkplaces,
+        tbDevices,
+        tbDevicesType,
+        tbDocuments,
+        tbDocumentsTables,
+        tbNomenclature,
+        tbDatabaseConfig,
+        tbBarcodes,
+        tables_INVALID=-1,
+    };
+
+    NLOHMANN_JSON_SERIALIZE_ENUM(tables, {
+        {tables_INVALID, nullptr}    ,
+        {tbUsers, "Users"}  ,
+        {tbMessages, "Messages"}  ,
+        {tbOrganizations, "Organizations"}  ,
+        {tbSubdivisions, "Subdivisions"}  ,
+        {tbWarehouses, "Warehouses"}  ,
+        {tbPriceTypes, "PriceTypes"}  ,
+        {tbWorkplaces, "Workplaces"}  ,
+        {tbDevices, "Devices"}  ,
+        {tbDevicesType, "DevicesType"}  ,
+        {tbDocuments, "Documents"}  ,
+        {tbDocumentsTables, "DocumentsTables"}  ,
+        {tbNomenclature, "Nomenclature"}  ,
+        {tbDatabaseConfig, "DatabaseConfig"}  ,
+        {tbBarcodes, "Barcodes"}  ,
+    })
+}
 
 #define ARR_SIZE(x) (sizeof(x) / sizeof(x[0]))
 inline void* _crypt(void* data, unsigned data_size, void* key, unsigned key_size)

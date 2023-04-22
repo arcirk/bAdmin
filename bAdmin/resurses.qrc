@@ -138,5 +138,8 @@
         <file>img/SqlDivaces.png</file>
         <file>img/root.png</file>
         <file>img/pricechecker.png</file>
+        <file>img/pricechecker_16_online.png</file>
+        <file>img/pricechecker_16.png</file>
+        <file>img/pricechecker_32.png</file>
     </qresource>
 </RCC>
