@@ -9,8 +9,10 @@
 #include <QVector>
 #include <dialogprofilefolder.h>
 #include <QFileDialog>
-#include <dialogdevice.h>
-#include <dialogselectinlist.h>
+#include "dialogabout.h"
+#include "dialogseversettings.h"
+#include "dialogdevice.h"
+#include "dialogselectinlist.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -174,6 +176,10 @@ void MainWindow::serverResponse(const arcirk::server::server_response &message)
         }else if(message.message == "error"){
             QMessageBox::critical(this, "Удаление файла", "Ошибка удаения файла!");
         }
+    }else if(message.command == arcirk::enum_synonym(arcirk::server::server_commands::GetTasks)){
+        if(message.message == "OK"){
+            tableResetModel(arcirk::server::Services, message.result.data());
+        }
     }
 }
 
@@ -292,19 +298,22 @@ void MainWindow::tableResetModel(server::server_objects key, const QByteArray& r
 
     }else if (key == DatabaseTables){
         auto tbls = nlohmann::json::parse(QByteArray::fromBase64(resp).toStdString());
-        if(tbls.is_array()){
-            auto columns = nlohmann::json::array();
-            columns += "Таблица";
-            auto rows = nlohmann::json::array();
-            for (auto itr = tbls.begin(); itr != tbls.end(); ++itr) {
-                auto row = nlohmann::json::object();
-                row["Таблица"] = *itr;
-                rows += row;
-            }
-            auto json = nlohmann::json::object();
-            json["columns"] = columns;
-            json["rows"] = rows;
-            m_models[DatabaseTables]->set_table(json);
+        if(tbls.is_object()){
+//            auto columns = nlohmann::json::array();
+//            //columns += "empty";
+//            columns += "Таблица";
+//            auto rows = nlohmann::json::array();
+//            for (auto itr = tbls.begin(); itr != tbls.end(); ++itr) {
+//                auto row = nlohmann::json::object();
+//                //row["empty"] = " ";
+//                row["Таблица"] = *itr;
+//                rows += row;
+//            }
+//            auto json = nlohmann::json::object();
+//            json["columns"] = columns;
+//            json["rows"] = rows;
+            m_models[DatabaseTables]->set_table(tbls);
+            //m_models[DatabaseTables]->set_table(json);
             m_models[DatabaseTables]->reset();
         }
     }else if (key == Devices){
@@ -312,6 +321,11 @@ void MainWindow::tableResetModel(server::server_objects key, const QByteArray& r
         m_models[Devices]->set_table(nlohmann::json::parse(tbls));
         update_icons(Devices, m_models[Devices]);
         m_models[Devices]->reset();
+    }else if (key == Services){
+        auto tbls = QByteArray::fromBase64(resp);
+        m_models[Services]->set_table(nlohmann::json::parse(tbls));
+        update_icons(Services, m_models[Services]);
+        m_models[Services]->reset();
     }
 
 }
@@ -445,6 +459,7 @@ void MainWindow::createColumnAliases()
     m_colAliases.insert("device_type", "Тип устройства");
     m_colAliases.insert("is_group", "Это группа");
     m_colAliases.insert("size", "Размер");
+    m_colAliases.insert("rows_count", "Количество записей");
 }
 
 void MainWindow::on_treeWidget_itemClicked(QTreeWidgetItem *item, int column)
@@ -458,12 +473,8 @@ void MainWindow::on_treeWidget_itemClicked(QTreeWidgetItem *item, int column)
 
     using namespace arcirk::server;
     if(key == QString(arcirk::enum_synonym(OnlineUsers).data())){
-//        ui->treeView->setVisible(false);
-//        ui->tableView->setVisible(true);
         get_online_users();
     }else if(key == QString(arcirk::enum_synonym(Root).data())){
-//        ui->treeView->setVisible(false);
-//        ui->tableView->setVisible(true);
         if(m_client->isConnected())
             m_client->send_command(arcirk::server::server_commands::ServerConfiguration, nlohmann::json{});
     }else if(key == QString(arcirk::enum_synonym(DatabaseTables).data())){
@@ -474,8 +485,6 @@ void MainWindow::on_treeWidget_itemClicked(QTreeWidgetItem *item, int column)
         if(m_client->isConnected())
             m_client->send_command(arcirk::server::server_commands::GetDatabaseTables, nlohmann::json{});
     }else if(key == QString(arcirk::enum_synonym(Devices).data())){
-//        ui->treeView->setVisible(false);
-//        ui->tableView->setVisible(true);
         if(m_client->isConnected()){
             auto query_param = nlohmann::json{
                 {"table_name", "DevicesView"},
@@ -489,8 +498,6 @@ void MainWindow::on_treeWidget_itemClicked(QTreeWidgetItem *item, int column)
                                    });
         }
     }else if(key == QString(arcirk::enum_synonym(DatabaseUsers).data())){
-//        ui->treeView->setVisible(true);
-//        ui->tableView->setVisible(false);
         if(m_models.find(DatabaseUsers) != m_models.end()){
             m_models[DatabaseUsers]->fetchRoot("Users");
             QVector<QString> m_hide{"ref", "parent", "is_group", "deletion_mark"};
@@ -514,19 +521,9 @@ void MainWindow::on_treeWidget_itemClicked(QTreeWidgetItem *item, int column)
                     ui->treeView->hideColumn(index);
             }
             ui->treeView->resizeColumnToContents(0);
-//            using json_nl = nlohmann::json;
-
-//            std::string uuid_form_ = arcirk::uuids::nil_string_uuid();
-
-//            json_nl param = {
-//                    {"table", true},
-//                    {"uuid_form", uuid_form_},
-//                    {"empty_column", false},
-//                    {"recursive", true}
-//            };
-
-//            m_client->send_command(arcirk::server::server_commands::ProfileDirFileList, param);
         }
+    }else if(key == QString(arcirk::enum_synonym(Services).data())){
+        m_client->send_command(arcirk::server::server_commands::GetTasks, nlohmann::json{});
     }
 
 }
@@ -646,6 +643,7 @@ void MainWindow::on_treeView_doubleClicked(const QModelIndex &index)
     auto model = (TreeViewModel*)ui->treeView->model();
     using namespace arcirk::database;
     using json = nlohmann::json;
+    using namespace arcirk::server;
 
     if(model->server_object() == arcirk::server::DatabaseUsers){
         auto object = model->get_object(index);
@@ -692,11 +690,29 @@ void MainWindow::on_treeView_doubleClicked(const QModelIndex &index)
         dlg.exec();
 
         if(dlg.result() == QDialog::Accepted){
+            nlohmann::json query_param = {
+                {"table_name", arcirk::enum_synonym(tables::tbUsers)},
+                {"query_type", "update"},
+                {"values", pre::json::to_json(struct_users)},
+                {"where_values", nlohmann::json({
+                     {"ref", struct_users.ref}
+                 })}
+            };
 
+            std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+            auto resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::ExecuteSqlQuery), json{
+                                                 {"query_param", base64_param}
+                                             });
+            if(resp.is_string()){
+                if(resp.get<std::string>() == "success"){
+                    model->set_object(index ,pre::json::to_json(struct_users));
+                    update_icons(server_objects::Devices, model);
+                }
+            }
         }
 
     }else if(model->server_object() == arcirk::server::Devices){
-        using namespace arcirk::server;
+
         auto ref = model->data(model->index(index.row(), model->get_column_index("ref"), index.parent()), Qt::DisplayRole).toString();
         json param{
             {"device", ref.toStdString()}
@@ -757,7 +773,7 @@ void MainWindow::on_btnDataImport_clicked()
         dlg.exec();
 
         if(dlg.result() == QDialog::Accepted){
-            auto tableName = index.data().toString();
+            auto tableName = model->index(index.row(), 0, index.parent()).data().toString();
             auto path = dlg.file_name();
             if(QMessageBox::question(this, "Импорт файла", QString("Импортировать данные из файла в таблицу %1?").arg(tableName)) == QMessageBox::No)
                 return;
@@ -834,27 +850,43 @@ void MainWindow::on_btnDelete_clicked()
 
     using namespace arcirk::server;
     using json = nlohmann::json;
-    if(model->server_object() == arcirk::server::ProfileDirectory){
+    if(model->server_object() == server_objects::ProfileDirectory){
 
         int ind = model->get_column_index("path");
         auto file_path = model->index(index.row(), ind, index.parent()).data().toString();
         auto file_name = model->index(index.row(), 0, index.parent()).data().toString();
         auto result = QMessageBox::question(this, "Удаление файла", QString("Удалить файл %1").arg(file_name));
 
-        if(result == QMessageBox::Yes){
+        if(result == QMessageBox::Yes) {
             json param{
-                {"file_name", file_path.toStdString()}
+                    {"file_name", file_path.toStdString()}
             };
             auto command = arcirk::enum_synonym(arcirk::server::server_commands::ProfileDeleteFile);
             auto resp = m_client->exec_http_query(command, param);
-            if(resp.get<std::string>() == "success")
+            if (resp.get<std::string>() == "success")
                 model->remove(index);
+        }
+    }else if(model->server_object() == server_objects::DatabaseUsers){
+        int ind = model->get_column_index("first");
+        int indRef = model->get_column_index("ref");
+        auto name = model->index(index.row(), ind, index.parent()).data().toString();
+        auto ref = model->index(index.row(), indRef, index.parent()).data().toString();
+        auto result = QMessageBox::question(this, "Удаление пользователя или группы", QString("Удалить пользователя или группу пользователей %1").arg(name));
+
+        if(result == QMessageBox::Yes){
+            using namespace arcirk::database::builder;
+            auto command = arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery);
+
+            json query_param = {
+                {"query_text", QString("DELETE FROM Users WHERE ref = '%1' OR parent = '%1';").arg(ref).toStdString()}
+            };
+            std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+            auto resp = m_client->exec_http_query(command, query_param);
+            model->remove(index);
 
         }
     }
 }
-
-
 void MainWindow::on_btnSetLinkDevice_clicked()
 {
     auto model = (TreeViewModel*)ui->treeView->model();
@@ -876,8 +908,8 @@ void MainWindow::on_btnSetLinkDevice_clicked()
             auto ref = res[ind];
             auto uuid = model->data(model->index(index.row(), indUuid, index.parent()), Qt::DisplayRole).toString();
             json param{
-                {"remote_session", uuid.toStdString()},
-                {"device_id", ref.toStdString()}
+                    {"remote_session", uuid.toStdString()},
+                    {"device_id", ref.toStdString()}
             };
             m_client->send_command(arcirk::server::server_commands::SetNewDeviceId, param);
 
@@ -885,3 +917,30 @@ void MainWindow::on_btnSetLinkDevice_clicked()
     }
 }
 
+
+void MainWindow::on_mnuAbout_triggered()
+{
+    auto dlg = DialogAbout(this);
+    dlg.setModal(true);
+    dlg.exec();
+}
+
+
+void MainWindow::on_mnuOptions_triggered()
+{
+    if(!m_client->isConnected())
+        return;
+    auto result_http = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ServerConfiguration), nlohmann::json{});
+    auto conf = pre::json::from_json<arcirk::server::server_config>(result_http);
+    auto dlg = DialogSeverSettings(conf, this);
+    dlg.setModal(true);
+    dlg.exec();
+    if(dlg.result() == QDialog::Accepted){
+
+        auto result = dlg.getResult();
+        m_client->send_command(arcirk::server::server_commands::UpdateServerConfiguration, nlohmann::json{
+                                   {"config", pre::json::to_json(result)}
+                               });
+
+    }
+}

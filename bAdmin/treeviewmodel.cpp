@@ -6,7 +6,7 @@
 
 QString TreeViewModel::cryptPass(const QString &source, const QString &key)
 {
-    std::string result = crypt(source.toStdString(), key.toStdString());
+    std::string result = arcirk::crypt(source.toStdString(), key.toStdString());
 
     return QString::fromStdString(result);
 }

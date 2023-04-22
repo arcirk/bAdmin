@@ -166,6 +166,7 @@ namespace arcirk::server{
         FileToDatabase,
         ProfileDeleteFile,
         DeviceGetFullInfo,
+        GetTasks,
         CMD_INVALID=-1,
     };
 
@@ -200,6 +201,7 @@ namespace arcirk::server{
          {FileToDatabase, "FileToDatabase"},
          {ProfileDeleteFile, "ProfileDeleteFile"}    ,
          {DeviceGetFullInfo, "DeviceGetFullInfo"}    ,
+         {GetTasks, "GetTasks"}    ,
     });
 
     enum server_objects{
@@ -283,6 +285,7 @@ BOOST_FUSION_DEFINE_STRUCT(
         (std::string, WebDavHost)
         (std::string, WebDavUser)
         (std::string, WebDavPwd)
+        (std::string, WebDavRoot)
         (bool, WebDavSSL)
         (int, SQLFormat)
         (std::string, SQLHost)
@@ -566,16 +569,19 @@ inline void* _crypt(void* data, unsigned data_size, void* key, unsigned key_size
     return data;
 }
 
-static inline std::string crypt(const std::string &source, const std::string& key) {
+namespace arcirk {
+    static inline std::string crypt(const std::string &source, const std::string& key) {
 
-    void * text = (void *) source.c_str();
-    void * pass = (void *) key.c_str();
-    _crypt(text, ARR_SIZE(source.c_str()), pass, ARR_SIZE(key.c_str()));
+        void * text = (void *) source.c_str();
+        void * pass = (void *) key.c_str();
+        _crypt(text, ARR_SIZE(source.c_str()), pass, ARR_SIZE(key.c_str()));
 
-    std::string result((char*)text);
+        std::string result((char*)text);
 
 
-    return result;
+        return result;
+    }
 }
+
 
 #endif // SHARED_STRUCT_HPP

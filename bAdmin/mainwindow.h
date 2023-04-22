@@ -53,6 +53,10 @@ private slots:
 
     void on_btnSetLinkDevice_clicked();
 
+    void on_mnuAbout_triggered();
+
+    void on_mnuOptions_triggered();
+
 private:
     Ui::MainWindow *                                        ui;
     WebSocketClient *                                       m_client;

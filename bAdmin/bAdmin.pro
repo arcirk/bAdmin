@@ -12,10 +12,12 @@ CONFIG += c++17
 SOURCES += \
     dialogselectinlist.cpp \
     connectiondialog.cpp \
+    dialogabout.cpp \
     dialogdevice.cpp \
     dialogimporttodatabase.cpp \
     dialogprofilefolder.cpp \
     dialogservers.cpp \
+    dialogseversettings.cpp \
     dialoguser.cpp \
     main.cpp \
     mainwindow.cpp \
@@ -29,9 +31,11 @@ HEADERS += \
     dialogselectinlist.h \
     connectiondialog.h \
     dialogdevice.h \
+    dialogabout.h \
     dialogimporttodatabase.h \
     dialogprofilefolder.h \
     dialogservers.h \
+    dialogseversettings.h \
     dialoguser.h \
     mainwindow.h \
     qjsontablemodel.h \
@@ -46,9 +50,11 @@ FORMS += \
     dialogselectinlist.ui \
     connectiondialog.ui \
     dialogdevice.ui \
+    dialogabout.ui \
     dialogimporttodatabase.ui \
     dialogprofilefolder.ui \
     dialogservers.ui \
+    dialogseversettings.ui \
     dialoguser.ui \
     mainwindow.ui
 

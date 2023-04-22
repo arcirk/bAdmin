@@ -2,6 +2,7 @@
 #include "ui_dialoguser.h"
 #include "websocketclient.h"
 #include <QMessageBox>
+#include <QStringListModel>
 
 DialogUser::DialogUser(arcirk::database::user_info& info, const QString& parentName,  QWidget *parent) :
     QDialog(parent),
@@ -14,6 +15,11 @@ DialogUser::DialogUser(arcirk::database::user_info& info, const QString& parentN
     ui->lblName->setText(info.first.c_str());
     ui->lblPresent->setText(info.second.c_str());
     ui->lblPwd->setText("***");
+
+    QStringList lst = {"", "user", "admin"};
+    auto model = new QStringListModel(lst);
+    ui->cmbRole->setModel(model);
+    ui->cmbRole->setCurrentText(QString::fromStdString(info.role));
 
     setWindowTitle(info.first.c_str());
 }
@@ -29,11 +35,12 @@ void DialogUser::accept()
         QMessageBox::critical(this, "Ошибка", "Пароль не должен быть пустым!");
         return;
     }
-    info_.first = ui->lblName->text().toStdString();
-    info_.second = ui->lblPresent->text().toStdString();
+    info_.first = ui->lblName->text().trimmed().toStdString();
+    info_.second = ui->lblPresent->text().trimmed().toStdString();
+    info_.role = ui->cmbRole->currentText().trimmed().toStdString();
 
     if(ui->btnPwdEdit->isChecked()){
-        info_.hash = WebSocketClient::generateHash(ui->lblName->text(), ui->lblPwd->text()).toStdString();
+        info_.hash = WebSocketClient::generateHash(ui->lblName->text().trimmed(), ui->lblPwd->text()).trimmed().toStdString();
     }
 
     QDialog::accept();

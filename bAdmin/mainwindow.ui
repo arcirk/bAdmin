@@ -71,6 +71,9 @@
           <iconset resource="resurses.qrc">
            <normaloff>:/img/itemAdd.png</normaloff>:/img/itemAdd.png</iconset>
          </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
         </widget>
        </item>
        <item>
@@ -85,6 +88,9 @@
           <iconset resource="resurses.qrc">
            <normaloff>:/img/itemEdit.png</normaloff>:/img/itemEdit.png</iconset>
          </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
         </widget>
        </item>
        <item>
@@ -98,6 +104,9 @@
          <property name="icon">
           <iconset resource="resurses.qrc">
            <normaloff>:/img/itemDelete.png</normaloff>:/img/itemDelete.png</iconset>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
          </property>
         </widget>
        </item>
@@ -174,6 +183,9 @@
           <iconset resource="resurses.qrc">
            <normaloff>:/img/importFromDatabase.png</normaloff>:/img/importFromDatabase.png</iconset>
          </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
         </widget>
        </item>
        <item>
@@ -187,6 +199,9 @@
          <property name="icon">
           <iconset resource="resurses.qrc">
            <normaloff>:/img/exportKeysToDatabase.png</normaloff>:/img/exportKeysToDatabase.png</iconset>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
          </property>
         </widget>
        </item>
@@ -220,6 +235,9 @@
          <property name="icon">
           <iconset resource="resurses.qrc">
            <normaloff>:/img/link.png</normaloff>:/img/link.png</iconset>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
          </property>
         </widget>
        </item>
@@ -272,6 +290,8 @@
     </property>
     <addaction name="mnuConnect"/>
     <addaction name="mnuDisconnect"/>
+    <addaction name="separator"/>
+    <addaction name="mnuOptions"/>
    </widget>
    <widget class="QMenu" name="menu_3">
     <property name="title">
@@ -300,6 +320,7 @@
    <addaction name="mnuConnect"/>
    <addaction name="mnuDisconnect"/>
    <addaction name="separator"/>
+   <addaction name="mnuOptions"/>
   </widget>
   <widget class="QDockWidget" name="dockWidgetObjects">
    <property name="windowTitle">
@@ -375,6 +396,15 @@
   <action name="mnuAbout">
    <property name="text">
     <string>&amp;О программе ...</string>
+   </property>
+  </action>
+  <action name="mnuOptions">
+   <property name="icon">
+    <iconset resource="resurses.qrc">
+     <normaloff>:/img/settings.ico</normaloff>:/img/settings.ico</iconset>
+   </property>
+   <property name="text">
+    <string>Параметры</string>
    </property>
   </action>
  </widget>

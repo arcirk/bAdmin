@@ -9,6 +9,11 @@
 #include <QCryptographicHash>
 #include <QIODevice>
 
+static bool field_is_exists(const nlohmann::json &object, const std::string &name) {
+    auto itr = object.find(name);
+    return itr != object.end();
+}
+
 WebSocketClient::WebSocketClient(QObject *parent)
     : QObject{parent}
 {
@@ -39,6 +44,13 @@ QString WebSocketClient::generateHash(const QString &usr, const QString &pwd)
 QString WebSocketClient::get_sha1(const QByteArray& p_arg){
     auto sha = QCryptographicHash::hash(p_arg, QCryptographicHash::Sha1);
     return sha.toHex();
+}
+
+std::string WebSocketClient::crypt(const QString &source, const QString &key)
+{
+    if(source.isEmpty())
+        return "";
+    return arcirk::crypt(source.toStdString(), key.toStdString());
 }
 
 QString WebSocketClient::get_hash(const QString& first, const QString& second){
@@ -214,7 +226,7 @@ void WebSocketClient::doConnectionChanged(bool state)
     emit connectionChanged(state);
 }
 
-nlohmann::json WebSocketClient::exec_http_query(const std::string &command, const nlohmann::json &param, const QByteArray& btt)
+nlohmann::json WebSocketClient::exec_http_query(const std::string &command, const nlohmann::json &param)
 {
     auto http_param = arcirk::synchronize::http_param();
     http_param.command = command;
@@ -253,8 +265,8 @@ nlohmann::json WebSocketClient::exec_http_query(const std::string &command, cons
     QString headerData = "Token " + QByteArray(conf_.hash.data()).toBase64();;
     request.setRawHeader("Authorization", headerData.toLocal8Bit());
 
-    ByteArray bt = param.value("data", ByteArray{});
-    if(bt.size() != 0){
+    if(field_is_exists(param, "data")){
+        ByteArray bt = param["data"];
         QStringList contentDisposition{"form-data"};
         auto items = param.items();
         for (auto itr = items.begin(); itr != items.end(); ++itr) {
