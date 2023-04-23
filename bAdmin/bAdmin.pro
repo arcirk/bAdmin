@@ -18,6 +18,7 @@ SOURCES += \
     dialogprofilefolder.cpp \
     dialogservers.cpp \
     dialogseversettings.cpp \
+    dialogtask.cpp \
     dialoguser.cpp \
     main.cpp \
     mainwindow.cpp \
@@ -36,6 +37,7 @@ HEADERS += \
     dialogprofilefolder.h \
     dialogservers.h \
     dialogseversettings.h \
+    dialogtask.h \
     dialoguser.h \
     mainwindow.h \
     qjsontablemodel.h \
@@ -55,6 +57,7 @@ FORMS += \
     dialogprofilefolder.ui \
     dialogservers.ui \
     dialogseversettings.ui \
+    dialogtask.ui \
     dialoguser.ui \
     mainwindow.ui
 

@@ -13,6 +13,7 @@
 #include "dialogseversettings.h"
 #include "dialogdevice.h"
 #include "dialogselectinlist.h"
+#include "dialogtask.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -460,6 +461,14 @@ void MainWindow::createColumnAliases()
     m_colAliases.insert("is_group", "Это группа");
     m_colAliases.insert("size", "Размер");
     m_colAliases.insert("rows_count", "Количество записей");
+    m_colAliases.insert("interval", "Интервал");
+    m_colAliases.insert("start_task", "Начало выполнения");
+    m_colAliases.insert("end_task", "Окончание выполнения");
+    m_colAliases.insert("allowed", "Разрешено");
+    m_colAliases.insert("predefined", "Предопределенный");
+    m_colAliases.insert("days_of_week", "По дням недели");
+    m_colAliases.insert("synonum", "Представление");
+    m_colAliases.insert("script", "Скрипт");
 }
 
 void MainWindow::on_treeWidget_itemClicked(QTreeWidgetItem *item, int column)
@@ -747,6 +756,14 @@ void MainWindow::on_treeView_doubleClicked(const QModelIndex &index)
                 }
             }
         }
+    }else if(model->server_object() == arcirk::server::Services){
+        auto obj = pre::json::from_json<arcirk::services::task_options>(model->get_object(index));
+        auto dlg = DialogTask(obj, this);
+        dlg.setModal(true);
+        dlg.exec();
+        if(dlg.result() == QDialog::Accepted){
+            model->set_object(index, pre::json::to_json(obj));
+        }
     }
 }
 
@@ -763,17 +780,17 @@ void MainWindow::on_btnDataImport_clicked()
     using namespace arcirk::server;
 
     if(model->server_object() == arcirk::server::DatabaseTables){
-        auto model = new TreeViewModel(m_client->conf(), this);
-        model->set_column_aliases(m_colAliases);
-        model->set_server_object(arcirk::server::DatabaseTables);
-        model->fetchRoot("ProfileDirectory", "shared_files/files");
-        auto dlg = DialogProfileFolder(model, this);
+        auto model_ = new TreeViewModel(m_client->conf(), this);
+        model_->set_column_aliases(m_colAliases);
+        model_->set_server_object(arcirk::server::ProfileDirectory);
+        model_->fetchRoot("ProfileDirectory", "shared_files/files");
+        auto dlg = DialogProfileFolder(model_, this);
         dlg.setModal(true);
         dlg.setWindowTitle("Выбор файла для импорта");
         dlg.exec();
 
         if(dlg.result() == QDialog::Accepted){
-            auto tableName = model->index(index.row(), 0, index.parent()).data().toString();
+            auto tableName = model->index(index.row(), model->get_column_index("name"), index.parent()).data().toString();
             auto path = dlg.file_name();
             if(QMessageBox::question(this, "Импорт файла", QString("Импортировать данные из файла в таблицу %1?").arg(tableName)) == QMessageBox::No)
                 return;
