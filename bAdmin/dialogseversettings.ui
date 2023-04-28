@@ -27,7 +27,7 @@
    <item row="0" column="0">
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="tab">
       <attribute name="title">
@@ -36,23 +36,6 @@
       <layout class="QGridLayout" name="gridLayout_3">
        <item row="0" column="0">
         <layout class="QGridLayout" name="gridLayout">
-         <item row="8" column="1">
-          <widget class="QCheckBox" name="chAllowDelayedAuth">
-           <property name="text">
-            <string>Разрешить отложенную авторизацию</string>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="0">
-          <widget class="QLabel" name="label_5">
-           <property name="text">
-            <string>Имя;</string>
-           </property>
-          </widget>
-         </item>
-         <item row="5" column="1">
-          <widget class="QLineEdit" name="edtProfileDir"/>
-         </item>
          <item row="5" column="0">
           <widget class="QLabel" name="label_6">
            <property name="text">
@@ -60,24 +43,12 @@
            </property>
           </widget>
          </item>
-         <item row="1" column="1">
-          <widget class="QLineEdit" name="edtServerHost"/>
-         </item>
-         <item row="9" column="1">
-          <spacer name="verticalSpacer">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
+         <item row="6" column="1">
+          <widget class="QCheckBox" name="chServerSsl">
+           <property name="text">
+            <string>SSL</string>
            </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>20</width>
-             <height>40</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-         <item row="0" column="1">
-          <widget class="QLineEdit" name="edtServerName"/>
+          </widget>
          </item>
          <item row="4" column="1">
           <widget class="QSpinBox" name="spinPort">
@@ -95,20 +66,6 @@
            </property>
           </widget>
          </item>
-         <item row="4" column="0">
-          <widget class="QLabel" name="label_2">
-           <property name="text">
-            <string>Порт:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="6" column="1">
-          <widget class="QCheckBox" name="chServerSsl">
-           <property name="text">
-            <string>SSL</string>
-           </property>
-          </widget>
-         </item>
          <item row="1" column="0">
           <widget class="QLabel" name="label">
            <property name="text">
@@ -116,10 +73,60 @@
            </property>
           </widget>
          </item>
+         <item row="1" column="1">
+          <widget class="QLineEdit" name="edtServerHost"/>
+         </item>
          <item row="7" column="1">
           <widget class="QCheckBox" name="chAutorizationMode">
            <property name="text">
             <string>На сервере требуется авторизация</string>
+           </property>
+          </widget>
+         </item>
+         <item row="8" column="1">
+          <widget class="QCheckBox" name="chAllowDelayedAuth">
+           <property name="text">
+            <string>Разрешить отложенную авторизацию</string>
+           </property>
+          </widget>
+         </item>
+         <item row="10" column="1">
+          <spacer name="verticalSpacer">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>40</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item row="4" column="0">
+          <widget class="QLabel" name="label_2">
+           <property name="text">
+            <string>Порт:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="5" column="1">
+          <widget class="QLineEdit" name="edtProfileDir"/>
+         </item>
+         <item row="0" column="1">
+          <widget class="QLineEdit" name="edtServerName"/>
+         </item>
+         <item row="0" column="0">
+          <widget class="QLabel" name="label_5">
+           <property name="text">
+            <string>Имя;</string>
+           </property>
+          </widget>
+         </item>
+         <item row="9" column="1">
+          <widget class="QCheckBox" name="chWriteLog">
+           <property name="text">
+            <string>Вести журнал</string>
            </property>
           </widget>
          </item>
@@ -458,6 +465,81 @@
           </layout>
          </item>
         </layout>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="custom">
+      <attribute name="title">
+       <string>Дополнительно</string>
+      </attribute>
+      <layout class="QGridLayout" name="gridLayout_11">
+       <item row="0" column="0">
+        <widget class="QGroupBox" name="groupBox_3">
+         <property name="title">
+          <string>Репозитории</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_13">
+          <item row="0" column="0">
+           <layout class="QGridLayout" name="gridLayout_12">
+            <item row="0" column="0">
+             <widget class="QLabel" name="label_3">
+              <property name="text">
+               <string>Прайс чекер:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="1">
+             <layout class="QHBoxLayout" name="horizontalLayout_4">
+              <item>
+               <widget class="QLineEdit" name="edtPriceCheckerRepo"/>
+              </item>
+              <item>
+               <widget class="QToolButton" name="btnSelPriceCheckerRepo">
+                <property name="text">
+                 <string>...</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="label_4">
+              <property name="text">
+               <string>Сервер:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <layout class="QHBoxLayout" name="horizontalLayout_5">
+              <item>
+               <widget class="QLineEdit" name="edtServerRepo"/>
+              </item>
+              <item>
+               <widget class="QToolButton" name="btnSelServerRepo">
+                <property name="text">
+                 <string>...</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </item>
+          <item row="1" column="0">
+           <spacer name="verticalSpacer_4">
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>40</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </widget>
        </item>
       </layout>
      </widget>

@@ -46,6 +46,17 @@ QString WebSocketClient::get_sha1(const QByteArray& p_arg){
     return sha.toHex();
 }
 
+void WebSocketClient::get_server_configuration_sync()
+{
+    try {
+        auto result_http = exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ServerConfiguration), nlohmann::json{});
+        server_conf_ = pre::json::from_json<arcirk::server::server_config>(result_http);
+    } catch (const std::exception& e) {
+        qCritical() << e.what();
+    }
+
+}
+
 std::string WebSocketClient::crypt(const QString &source, const QString &key)
 {
     if(source.isEmpty())
@@ -62,6 +73,11 @@ QString WebSocketClient::get_hash(const QString& first, const QString& second){
 client::client_conf &WebSocketClient::conf()
 {
     return conf_;
+}
+
+server::server_config &WebSocketClient::server_conf()
+{
+    return server_conf_;
 }
 
 
@@ -156,17 +172,13 @@ void WebSocketClient::parse_response(const QString &resp)
         qDebug() << QDateTime::currentDateTime().toString("hh:mm:ss") << __FUNCTION__ << QString::fromStdString(msg.command);
         if(msg.command == arcirk::enum_synonym(arcirk::server::server_commands::SetClientParam)){
             if(msg.message == "OK"){
+                get_server_configuration_sync();
                 QString result = QByteArray::fromBase64(msg.param.data());
                 auto param = pre::json::from_json<arcirk::client::client_param>(result.toStdString());
                 m_currentSession = QUuid::fromString(QString::fromStdString(param.session_uuid));
                 m_currentUserUuid = QUuid::fromString(QString::fromStdString(param.user_uuid));
                 doConnectionSuccess();
-                doConnectionChanged(true);
-//                //поочередное выполнение
-//                m_async_await.append(std::bind(&WebSocketClient::updateHttpServiceConfiguration, this));
-//                m_async_await.append(std::bind(&WebSocketClient::updateDavServiceConfiguration, this));
-//                m_async_await.append(std::bind(&WebSocketClient::get_workplace_options, this));
-//                asyncAwait();
+                doConnectionChanged(true);;
             }else{
                 doDisplayError("SetClientParam", "Ошибка авторизации");
             }

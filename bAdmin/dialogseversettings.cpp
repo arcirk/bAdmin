@@ -1,13 +1,15 @@
 #include "dialogseversettings.h"
 #include "ui_dialogseversettings.h"
 #include "websocketclient.h"
-
+#include <QDir>
+#include <QFileDialog>
 #include <QToolButton>
 
-DialogSeverSettings::DialogSeverSettings(arcirk::server::server_config& conf, QWidget *parent) :
+DialogSeverSettings::DialogSeverSettings(arcirk::server::server_config& conf, arcirk::client::client_conf& conf_cl, QWidget *parent) :
     QDialog(parent),
     ui(new Ui::DialogSeverSettings),
-    conf_(conf)
+    conf_(conf),
+    conf_cl_(conf_cl)
 {
     ui->setupUi(this);
 
@@ -33,6 +35,12 @@ DialogSeverSettings::DialogSeverSettings(arcirk::server::server_config& conf, QW
     ui->edtSQLUser->setText(conf.SQLUser.c_str());
     ui->edtSQLPassword->setText(WebSocketClient::crypt(conf.SQLPassword.c_str(), "my_key").c_str());
     ui->edtExchangePlan->setText(conf.ExchangePlan.c_str());
+
+    ui->edtPriceCheckerRepo->setText(conf_cl.price_checker_repo.c_str());
+    ui->edtServerRepo->setText(conf_cl.server_repo.c_str());
+    ui->chWriteLog->setCheckState(conf.WriteJournal == 0 ? Qt::CheckState::Unchecked : Qt::CheckState::Checked);
+
+    setWindowTitle(windowTitle() + QString("(%1").arg(conf.ServerName.c_str()));
 }
 
 DialogSeverSettings::~DialogSeverSettings()
@@ -62,6 +70,10 @@ void DialogSeverSettings::accept()
     if(ui->btnEditSQLPassword->isChecked())
         conf_.SQLPassword = WebSocketClient::crypt( ui->edtSQLPassword->text(), "my_key");
     conf_.ExchangePlan = ui->edtExchangePlan->text().toStdString();
+    conf_.WriteJournal = ui->chWriteLog->isChecked();
+
+    conf_cl_.server_repo = ui->edtServerRepo->text().toStdString();
+    conf_cl_.price_checker_repo = ui->edtPriceCheckerRepo->text().toStdString();
 
     QDialog::accept();
 }
@@ -132,5 +144,14 @@ void DialogSeverSettings::on_btnViewSQLPassword_toggled(bool checked)
 {
     auto btn = dynamic_cast<QToolButton*>(sender());
     onViewPwdToggled(checked, btn, ui->edtSQLPassword);
+}
+
+
+void DialogSeverSettings::on_btnSelPriceCheckerRepo_clicked()
+{
+    auto result = QFileDialog::getExistingDirectory(this, "Выбор каталога", ui->edtPriceCheckerRepo->text());
+    if(!result.isEmpty()){
+        ui->edtPriceCheckerRepo->setText(result);
+    }
 }
 

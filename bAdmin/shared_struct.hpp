@@ -282,6 +282,8 @@ BOOST_FUSION_DEFINE_STRUCT(
         (std::string, hash)
         (std::string, device_id)
         (ByteArray, servers)
+        (std::string, price_checker_repo)
+        (std::string, server_repo)
 );
 
 BOOST_FUSION_DEFINE_STRUCT(
@@ -320,6 +322,7 @@ BOOST_FUSION_DEFINE_STRUCT(
         (bool, AllowHistoryMessages)
         (std::string, ExchangePlan)
         (std::string, ServerProtocol)
+        (bool, WriteJournal)
 );
 
 BOOST_FUSION_DEFINE_STRUCT(

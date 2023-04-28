@@ -26,6 +26,7 @@ public:
     bool isStarted();
 
     client::client_conf& conf();
+    server::server_config& server_conf();
 
     bool isConnected();
 
@@ -41,7 +42,7 @@ public:
 
 private:
     client::client_conf conf_;
-    server::server_config server_conf;
+    server::server_config server_conf_;
     QWebSocket* m_client;
 
     QUuid m_currentSession;
@@ -72,6 +73,8 @@ private:
     static QString get_hash(const QString& first, const QString& second);
     static QString get_sha1(const QByteArray& p_arg);
 
+
+    void get_server_configuration_sync();
 
 signals:
     void displayError(const QString& what, const QString& err);

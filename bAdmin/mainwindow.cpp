@@ -14,6 +14,7 @@
 #include "dialogdevice.h"
 #include "dialogselectinlist.h"
 #include "dialogtask.h"
+#include <QStandardPaths>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -95,6 +96,9 @@ void MainWindow::connectionSuccess()
         ui->treeView->setUniformRowHeights(true);
         ui->treeView->setModel(m_models[arcirk::server::DatabaseUsers]);
     }
+//    auto tree = ui->treeWidget;
+//    if(tree->topLevelItem(0))
+
 }
 
 void MainWindow::connectionChanged(bool state)
@@ -110,10 +114,11 @@ void MainWindow::connectionChanged(bool state)
         tree->clear();
         ui->treeView->setModel(nullptr);
     }else{
-        infoBar->setText("Подключен: " + QString(m_client->conf().server_host.data()));
-        if(!tree->topLevelItem(0))
-            fillDefaultTree();
-        tree->topLevelItem(0)->setText(0, QString(m_client->conf().server_host.data()));
+        infoBar->setText(QString("Подключен: %1 (%2)").arg(m_client->conf().server_host.c_str(), m_client->server_conf().ServerName.c_str()));
+        if(!tree->topLevelItem(0)){
+            fillDefaultTree();          
+        }
+         tree->topLevelItem(0)->setText(0, QString("%1 (%2)").arg(m_client->conf().server_host.c_str(), m_client->server_conf().ServerName.c_str()));
 
     }
 }
@@ -929,7 +934,6 @@ void MainWindow::on_btnSetLinkDevice_clicked()
                     {"device_id", ref.toStdString()}
             };
             m_client->send_command(arcirk::server::server_commands::SetNewDeviceId, param);
-
         }
     }
 }
@@ -949,7 +953,7 @@ void MainWindow::on_mnuOptions_triggered()
         return;
     auto result_http = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ServerConfiguration), nlohmann::json{});
     auto conf = pre::json::from_json<arcirk::server::server_config>(result_http);
-    auto dlg = DialogSeverSettings(conf, this);
+    auto dlg = DialogSeverSettings(conf, m_client->conf(), this);
     dlg.setModal(true);
     dlg.exec();
     if(dlg.result() == QDialog::Accepted){
