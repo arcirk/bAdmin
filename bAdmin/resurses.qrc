@@ -141,5 +141,7 @@
         <file>img/pricechecker_16_online.png</file>
         <file>img/pricechecker_16.png</file>
         <file>img/pricechecker_32.png</file>
+        <file>img/move_end.png</file>
+        <file>img/startTask.png</file>
     </qresource>
 </RCC>

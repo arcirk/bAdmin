@@ -773,6 +773,28 @@ nlohmann::json TreeViewModel::get_object(const QModelIndex &index) const
 
 }
 
+nlohmann::json TreeViewModel::get_objects(const QModelIndex &parent) const
+{
+    NodeInfo* parentInfo = static_cast<NodeInfo*>(parent.internalPointer());
+
+    using json = nlohmann::json;
+
+    json result = json::array();
+
+    if(parentInfo == 0){
+        for (auto itr = _nodes.begin(); itr != _nodes.end(); ++itr) {
+            result += itr->rowData;
+        }
+    }else{
+        for (auto itr = parentInfo->children.begin(); itr != parentInfo->children.end(); ++itr) {
+            result += itr->rowData;
+        }
+    }
+
+    return result;
+
+}
+
 void TreeViewModel::clear()
 {
     //rows_icon = QIcon();

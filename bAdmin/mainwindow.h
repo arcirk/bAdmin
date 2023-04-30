@@ -57,6 +57,10 @@ private slots:
 
     void on_mnuOptions_triggered();
 
+    void on_btnTaskRestart_clicked();
+
+    void on_btnStartTask_clicked();
+
 private:
     Ui::MainWindow *                                        ui;
     WebSocketClient *                                       m_client;

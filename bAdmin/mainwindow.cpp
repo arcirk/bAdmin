@@ -15,6 +15,7 @@
 #include "dialogselectinlist.h"
 #include "dialogtask.h"
 #include <QStandardPaths>
+#include <QException>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -253,13 +254,18 @@ QTreeWidgetItem * MainWindow::findTreeItem(const QString& key, QTreeWidgetItem* 
 
 void MainWindow::tableSetModel(const QString &key)
 {
-    nlohmann::json m_key = key.toStdString();
-    auto e_key = m_key.get<arcirk::server::server_objects>();
-    auto model = m_models[e_key];
-    auto table = ui->treeView;
-    table->setModel(nullptr);
-    table->setModel(model);
-    table->resizeColumnToContents(0);
+    try {
+        nlohmann::json m_key = key.toStdString();
+        auto e_key = m_key.get<arcirk::server::server_objects>();
+        auto model = m_models[e_key];
+        auto table = ui->treeView;
+        table->setModel(nullptr);
+        table->setModel(model);
+        table->resizeColumnToContents(0);
+    } catch (const QException& e) {
+        qCritical() << e.what();
+    }
+
 
 }
 
@@ -768,6 +774,10 @@ void MainWindow::on_treeView_doubleClicked(const QModelIndex &index)
         dlg.exec();
         if(dlg.result() == QDialog::Accepted){
             model->set_object(index, pre::json::to_json(obj));
+            auto arr_service = model->get_objects(index.parent());
+            json param{};
+            param["task_options"] = arr_service;
+            m_client->send_command(server_commands::UpdateTaskOptions, param);
         }
     }
 }
@@ -808,7 +818,7 @@ void MainWindow::on_btnDataImport_clicked()
             }
         }
 
-        delete model;
+        delete model_;
     }
 }
 
@@ -965,3 +975,33 @@ void MainWindow::on_mnuOptions_triggered()
 
     }
 }
+
+void MainWindow::on_btnTaskRestart_clicked()
+{
+    auto model = (TreeViewModel*)ui->treeView->model();
+    if(model->server_object() == arcirk::server::Services){
+        m_client->send_command(arcirk::server::server_commands::TasksRestart, nlohmann::json{});
+    }
+}
+
+
+void MainWindow::on_btnStartTask_clicked()
+{
+    auto model = (TreeViewModel*)ui->treeView->model();
+    auto index = ui->treeView->currentIndex();
+    if(!index.isValid()){
+        QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
+        return;
+    }
+    if(QMessageBox::question(this, "Выполнить задачу", "Выполнить текущую задачу,") == QMessageBox::No)
+        return;
+
+    auto indUuid = model->get_column_index("uuid");
+    auto uuid = model->data(model->index(index.row(), indUuid, index.parent()), Qt::DisplayRole).toString();
+
+    m_client->send_command(arcirk::server::server_commands::RunTask, nlohmann::json{
+                               {"task_uuid", uuid.toStdString()},
+                               {"custom_interval", 0}
+                           });
+}
+

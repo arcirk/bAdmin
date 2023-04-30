@@ -43,6 +43,7 @@ public:
     void set_server_object(arcirk::server::server_objects obj);
     arcirk::server::server_objects server_object() const;
     nlohmann::json get_object(const QModelIndex &index) const;
+    nlohmann::json get_objects(const QModelIndex &parent) const;
     void set_rows_icon(const QIcon &ico);
     void set_icon(const QModelIndex& index, const QIcon &ico);
 
