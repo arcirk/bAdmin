@@ -40,6 +40,15 @@ public:
 
     static std::string crypt(const QString &source, const QString &key);
 
+    static arcirk::client::version_application get_version(){
+         QStringList vec = QString(ARCIRK_VERSION).split(".");
+         auto ver = arcirk::client::version_application();
+         ver.major = vec[0].toInt();
+         ver.minor = vec[1].toInt();
+         ver.path = vec[2].toInt();
+        return ver;
+    }
+
 private:
     client::client_conf conf_;
     server::server_config server_conf_;

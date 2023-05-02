@@ -346,7 +346,7 @@ void WebSocketClient::onConnected()
     param.app_name = conf_.app_name;
     param.host_name = QSysInfo::machineHostName().toStdString();
     param.system_user = "root";
-
+    param.version = CLIENT_VERSION;
     param.user_name = conf_.user_name;
     param.hash = conf_.hash;
     param.device_id = conf_.device_id;

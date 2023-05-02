@@ -19,6 +19,7 @@
 
 #define ARCIRK_VERSION "1.1.0"
 #define CONF_FILENAME "b_admin_conf.json"
+#define CLIENT_VERSION 1
 
 typedef unsigned char BYTE;
 typedef std::vector<BYTE> ByteArray;
@@ -128,6 +129,7 @@ BOOST_FUSION_DEFINE_STRUCT(
         (std::string, session_uuid)
         (std::string, system_user)
         (std::string, device_id)
+        (int, version)
 )
 
 BOOST_FUSION_DEFINE_STRUCT(

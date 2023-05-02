@@ -968,6 +968,7 @@ void MainWindow::on_mnuOptions_triggered()
     dlg.exec();
     if(dlg.result() == QDialog::Accepted){
 
+        m_client->write_conf();
         auto result = dlg.getResult();
         m_client->send_command(arcirk::server::server_commands::UpdateServerConfiguration, nlohmann::json{
                                    {"config", pre::json::to_json(result)}
@@ -1003,5 +1004,56 @@ void MainWindow::on_btnStartTask_clicked()
                                {"task_uuid", uuid.toStdString()},
                                {"custom_interval", 0}
                            });
+}
+
+
+void MainWindow::on_btnSendClientRelease_clicked()
+{
+    auto model = (TreeViewModel*)ui->treeView->model();
+    auto index = ui->treeView->currentIndex();
+    if(!index.isValid()){
+        QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
+        return;
+    }
+
+    if(model->server_object() == arcirk::server::ProfileDirectory){
+
+        QString result = QString::fromStdString(m_client->conf().price_checker_repo) + "/android-build-release-signed.apk";
+        if(!QFile(result).exists())
+        {
+            QMessageBox::critical(this, "Ошибка", "Не верный путь к репозиторию!");
+            return;
+        }
+        if(!result.isEmpty()){
+            ByteArray data{};
+            try {
+                arcirk::read_file(result.toStdString(), data);
+                if(data.size() > 0){
+                    auto destantion = model->current_parent_path();
+                    //QUrl url(result);
+                    //auto file_name = url.fileName();
+                    auto ver = WebSocketClient::get_version();
+                    json param{
+                        {"destantion", destantion.toStdString()},
+                        {"file_name", QString("checker_v%1_%2_%3.apk").arg(QString::number(ver.major)).arg( QString::number(ver.major)).arg( QString::number(CLIENT_VERSION)).toStdString()},
+                        {"data", data}
+                    };
+                    auto resp = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::DownloadFile), param);
+                        if(resp  != "error"){
+                            int is_folder = model->index(index.row(), model->get_column_index("is_group"), index.parent()).data().toInt();
+                            if(is_folder == 0)
+                                model->add(resp,  index.parent());
+                            else
+                                model->add(resp, index);
+                        }
+                }
+
+            } catch (const std::exception& e) {
+                QMessageBox::critical(this, "Ошибка", e.what());
+                return;
+            }
+
+        }
+    }
 }
 
