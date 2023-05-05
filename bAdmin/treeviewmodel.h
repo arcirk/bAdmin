@@ -60,6 +60,8 @@ public:
     void add(const nlohmann::json object, const QModelIndex &parent);
     void set_object(const QModelIndex &index, const nlohmann::json& object);
 
+    void use_hierarchy(const std::string& column);
+
 private:
     arcirk::server::server_objects server_object_;
     QVector<QString> columns;
@@ -71,6 +73,7 @@ private:
     QByteArray authString_;
     QMap<QString, QString> column_aliases;
     bool is_loaded_;
+    std::string use_hierarchy_;
 
     QString current_parent_path_;
 

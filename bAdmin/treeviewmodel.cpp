@@ -105,6 +105,7 @@ nlohmann::json TreeViewModel::getNodeData(const QString &parentUuid) const
 
     auto param = nlohmann::json::object();
     param["query_text"] = query_text;
+    //param["empty_column"] = true;
 
     auto http_param = arcirk::synchronize::http_param();
     http_param.command = arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery);
@@ -599,6 +600,11 @@ void TreeViewModel::set_object(const QModelIndex &index, const nlohmann::json &o
     //endResetModel();
 }
 
+void TreeViewModel::use_hierarchy(const std::string &column)
+{
+    use_hierarchy_ = column;
+}
+
 void TreeViewModel::set_current_parent_path(const QString &value)
 {
     current_parent_path_ = value;
@@ -624,9 +630,17 @@ void TreeViewModel::fetchRoot(const QString& table_name, const QString& root_dir
         columns.clear();
         auto cols = http_result["columns"];
         if(cols.is_array()){
+            bool is_valid_hierarchy = false;
             for (auto itr = cols.begin(); itr != cols.end(); ++itr) {
                 std::string name = *itr;
+                if(!use_hierarchy_.empty() && use_hierarchy_ == name){
+                    is_valid_hierarchy = true;
+                    continue;
+                }
                 columns.push_back(QString::fromStdString(name));
+            }
+            if(is_valid_hierarchy){
+                columns.insert(0, QString::fromStdString(use_hierarchy_));
             }
         }
         beginResetModel();

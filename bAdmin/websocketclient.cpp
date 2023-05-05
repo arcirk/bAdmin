@@ -211,6 +211,8 @@ void WebSocketClient::parse_response(const QString &resp)
         }
         else if(msg.command == arcirk::enum_synonym(arcirk::server::server_commands::GetDatabaseTables)){
             emit serverResponse(msg);
+        }else if(msg.command == "notify"){
+            emit notify(msg.message.c_str());
         }else
             emit serverResponse(msg);
     } catch (std::exception& e) {

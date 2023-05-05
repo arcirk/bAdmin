@@ -214,6 +214,9 @@
           <iconset resource="resurses.qrc">
            <normaloff>:/img/copyToDisk.png</normaloff>:/img/copyToDisk.png</iconset>
          </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
         </widget>
        </item>
        <item>
@@ -273,6 +276,9 @@
        </item>
        <item>
         <widget class="QToolButton" name="btnTaskRestart">
+         <property name="statusTip">
+          <string>Перезапустить</string>
+         </property>
          <property name="text">
           <string>...</string>
          </property>

@@ -90,6 +90,7 @@ signals:
     void connectionSuccess(); //при успешной авторизации
     void connectionChanged(bool state);
     void serverResponse(const arcirk::server::server_response& message);
+    void notify(const QString& message);
 
 private slots:
 

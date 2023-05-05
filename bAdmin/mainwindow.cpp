@@ -43,7 +43,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     fillDefaultTree();
 
-    createModels();
+    //createModels();
 
     setWindowTitle("Менеджер сервера");
 }
@@ -88,10 +88,12 @@ void MainWindow::displayError(const QString &what, const QString &err)
 
 void MainWindow::connectionSuccess()
 {
+    createModels();
     get_online_users();
     if(m_models.find(arcirk::server::DatabaseUsers) == m_models.end()){
         m_models.insert(arcirk::server::DatabaseUsers, new TreeViewModel(m_client->conf(), this));
         m_models[arcirk::server::DatabaseUsers]->set_columns({"first","second","ref","parent", "is_group", "deletion_mark"});
+        m_models[arcirk::server::DatabaseUsers]->use_hierarchy("first");
         m_models[arcirk::server::DatabaseUsers]->set_column_aliases(m_colAliases);
         m_models[arcirk::server::DatabaseUsers]->set_server_object(arcirk::server::DatabaseUsers);
         ui->treeView->setUniformRowHeights(true);
@@ -405,13 +407,16 @@ void MainWindow::createModels()
         ProfileDirectory
     };
 
+    m_models.clear();
+
     foreach (auto const& itr, vec) {
         auto model = new TreeViewModel(m_client->conf(), this);
         model->set_column_aliases(m_colAliases);
         model->set_server_object(itr);
-        if(itr == DatabaseUsers)
+        if(itr == DatabaseUsers){
             model->set_columns({"first","second","ref","parent", "is_group", "deletion_mark"});
-        else if(itr == DatabaseTables){
+            model->use_hierarchy("first");
+        }else if(itr == DatabaseTables){
             model->set_rows_icon(QIcon(":/img/externalDataTable.png"));
         }
         m_models.insert(itr, model);
@@ -526,7 +531,7 @@ void MainWindow::on_treeWidget_itemClicked(QTreeWidgetItem *item, int column)
                 if(index != -1)
                     ui->treeView->hideColumn(index);
             }
-            ui->treeView->hideColumn(m_models[DatabaseUsers]->columnCount(QModelIndex()) - 1);
+//            ui->treeView->hideColumn(m_models[DatabaseUsers]->columnCount(QModelIndex()) - 1);
         }
         ui->treeView->resizeColumnToContents(0);
 
@@ -911,6 +916,25 @@ void MainWindow::on_btnDelete_clicked()
 
             json query_param = {
                 {"query_text", QString("DELETE FROM Users WHERE ref = '%1' OR parent = '%1';").arg(ref).toStdString()}
+            };
+            std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+            auto resp = m_client->exec_http_query(command, query_param);
+            model->remove(index);
+
+        }
+    }else if(model->server_object() == server_objects::Devices){
+        int ind = model->get_column_index("first");
+        int indRef = model->get_column_index("ref");
+        auto name = model->index(index.row(), ind, index.parent()).data().toString();
+        auto ref = model->index(index.row(), indRef, index.parent()).data().toString();
+        auto result = QMessageBox::question(this, "Удаление устройства", QString("Удалить устройство %1").arg(name));
+
+        if(result == QMessageBox::Yes){
+            using namespace arcirk::database::builder;
+            auto command = arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery);
+
+            json query_param = {
+                {"query_text", QString("DELETE FROM Devices WHERE ref = '%1';").arg(ref).toStdString()}
             };
             std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
             auto resp = m_client->exec_http_query(command, query_param);
