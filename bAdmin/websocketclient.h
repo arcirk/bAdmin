@@ -35,6 +35,8 @@ public:
     void write_conf();
 
     void send_command(arcirk::server::server_commands cmd, const nlohmann::json& param = {});
+    void command_to_client(const std::string &receiver, const std::string &command,
+                                         const nlohmann::json &param = {});
 
     nlohmann::json exec_http_query(const std::string& command, const nlohmann::json& param);
 

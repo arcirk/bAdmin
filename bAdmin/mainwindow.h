@@ -63,6 +63,8 @@ private slots:
 
     void on_btnSendClientRelease_clicked();
 
+    void on_btnSendoToClient_clicked();
+
 private:
     Ui::MainWindow *                                        ui;
     WebSocketClient *                                       m_client;

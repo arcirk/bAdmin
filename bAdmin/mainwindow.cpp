@@ -135,6 +135,7 @@ void MainWindow::formControl()
 
     app_icons.insert(arcirk::server::application_names::PriceChecker, qMakePair(QIcon(":/img/pricechecker.png"), QIcon(":/img/pricechecker.png")));
     app_icons.insert(arcirk::server::application_names::ServerManager, qMakePair(QIcon(":/img/socket.ico"), QIcon(":/img/socket.ico")));
+    app_icons.insert(arcirk::server::application_names::ExtendedLib, qMakePair(QIcon(":/img/1cv8.png"), QIcon(":/img/1cv8.png")));
 
 }
 
@@ -628,6 +629,8 @@ void MainWindow::update_icons(arcirk::server::server_objects key, TreeViewModel 
                 model->set_icon(model->index(i,0,parent), app_icons[PriceChecker].first);
             }else if(type_app == ServerManager){
                 model->set_icon(model->index(i,0,parent), app_icons[ServerManager].first);
+            }else if(type_app == ExtendedLib){
+                model->set_icon(model->index(i,0,parent), app_icons[ExtendedLib].first);
             }
         }
     }
@@ -1078,6 +1081,22 @@ void MainWindow::on_btnSendClientRelease_clicked()
             }
 
         }
+    }
+}
+
+
+void MainWindow::on_btnSendoToClient_clicked()
+{
+    auto model = (TreeViewModel*)ui->treeView->model();
+    auto index = ui->treeView->currentIndex();
+    if(!index.isValid()){
+        QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
+        return;
+    }
+    if(model->server_object() == arcirk::server::OnlineUsers){
+        auto ind = model->get_column_index("session_uuid");
+        auto rec = model->data(model->index(index.row(), ind, index.parent()), Qt::DisplayRole).toString();
+        m_client->command_to_client(rec.toStdString(), "GetForms");
     }
 }
 

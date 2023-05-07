@@ -255,6 +255,7 @@ namespace arcirk::server{
     enum application_names{
         PriceChecker,
         ServerManager,
+        ExtendedLib,
         APP_INVALID=-1,
     };
 
@@ -262,6 +263,7 @@ namespace arcirk::server{
         {APP_INVALID, nullptr} ,
         {PriceChecker, "PriceChecker"} ,
         {ServerManager, "ServerManager"} ,
+        {ExtendedLib, "ExtendedLib"} ,
     });
 
     enum device_types{

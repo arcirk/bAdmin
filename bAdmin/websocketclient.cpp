@@ -194,9 +194,6 @@ void WebSocketClient::parse_response(const QString &resp)
 //                //parse_exec_query_result(msg);
 //            else
 //                emit displayError("ExecuteSqlQuery", QString::fromStdString(msg.message));
-        }else if(msg.command == arcirk::enum_synonym(arcirk::server::server_commands::CommandToClient)){
-            //qDebug() << __FUNCTION__ << "CommandToClient";
-            //parse_command_to_client(msg.receiver, msg.sender, msg.param);
         }else if(msg.command == arcirk::enum_synonym(arcirk::server::server_commands::SyncGetDiscrepancyInData)){
             //synchronizeBaseNext(msg);
         }
@@ -213,6 +210,8 @@ void WebSocketClient::parse_response(const QString &resp)
             emit serverResponse(msg);
         }else if(msg.command == "notify"){
             emit notify(msg.message.c_str());
+        }else if(msg.command == arcirk::enum_synonym(arcirk::server::server_commands::CommandToClient)){
+            qDebug() << msg.command.c_str();
         }else
             emit serverResponse(msg);
     } catch (std::exception& e) {
@@ -336,6 +335,35 @@ void WebSocketClient::send_command(server::server_commands cmd, const nlohmann::
 //        {"parameters", p}
 //    };
     QString cmd_text = "cmd " + QString::fromStdString(arcirk::enum_synonym(cmd)) + " " + QString::fromStdString(_param.dump()).toUtf8().toBase64();
+
+    m_client->sendTextMessage(cmd_text);
+}
+
+void WebSocketClient::command_to_client(const std::string &receiver, const std::string &command, const nlohmann::json &param)
+{
+    if(command.empty() || receiver.empty())
+        return;
+
+    std::string cmd = "cmd " + enum_synonym(arcirk::server::server_commands::CommandToClient) + " " + receiver;
+
+    using json = nlohmann::json;
+
+
+    std::string private_param = QString::fromStdString(param.dump()).toUtf8().toBase64().toStdString();
+    json param_ = {
+            {"parameters", private_param}        ,
+            {"recipient", receiver},
+            {"command", command}
+    };
+
+    json p = {
+        {enum_synonym(arcirk::server::server_commands::CommandToClient), QString::fromStdString(param_.dump()).toUtf8().toBase64().toStdString()}
+    };
+
+    cmd.append(" ");
+    cmd.append(QString::fromStdString(p.dump()).toUtf8().toBase64().toStdString());
+
+    QString cmd_text = QString::fromStdString(cmd);
 
     m_client->sendTextMessage(cmd_text);
 }
