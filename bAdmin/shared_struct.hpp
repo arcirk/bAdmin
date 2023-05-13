@@ -19,7 +19,7 @@
 
 #define ARCIRK_VERSION "1.1.0"
 #define CONF_FILENAME "b_admin_conf.json"
-#define CLIENT_VERSION 1
+#define CLIENT_VERSION 2
 
 typedef unsigned char BYTE;
 typedef std::vector<BYTE> ByteArray;
