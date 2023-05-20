@@ -70,6 +70,8 @@ namespace arcirk{
     {
 
         FILE * fp = fopen(filename.c_str(), "rb");
+        if (fp == NULL)
+            throw std::runtime_error(std::strerror(errno));
 
         fseek(fp, 0, SEEK_END);
         size_t flen= ftell(fp);
@@ -129,6 +131,7 @@ BOOST_FUSION_DEFINE_STRUCT(
         (std::string, session_uuid)
         (std::string, system_user)
         (std::string, device_id)
+        (std::string, info_base)
         (int, version)
 )
 
@@ -149,6 +152,7 @@ BOOST_FUSION_DEFINE_STRUCT(
         (std::string, version)
         (ByteArray, data)
 )
+
 
 namespace arcirk::server{
 
@@ -237,6 +241,10 @@ namespace arcirk::server{
         Devices,
         DatabaseUsers,
         ProfileDirectory,
+        CertManager,
+        Containers,
+        Certificates,
+        CertUsers,
         OBJ_INVALID=-1,
     };
 
@@ -250,6 +258,10 @@ namespace arcirk::server{
         {Devices, "Devices"},
         {DatabaseUsers, "DatabaseUsers"},
         {ProfileDirectory, "ProfileDirectory"},
+        {CertManager, "CertManager"},
+        {Containers, "Containers"},
+        {Certificates, "Certificates"},
+        {CertUsers, "CertUsers"},
     });
 
     enum application_names{
@@ -543,6 +555,65 @@ BOOST_FUSION_DEFINE_STRUCT(
                 (int, bk)
 );
 
+BOOST_FUSION_DEFINE_STRUCT(
+        (arcirk::database), containers,
+        (int, _id)
+        (std::string, first)
+        (std::string, second)
+        (std::string, ref)
+        (std::string, cache)
+        (ByteArray, data)
+        (std::string, subject)
+        (std::string, issuer)
+        (std::string, not_valid_before)
+        (std::string, not_valid_after)
+        (std::string, parent_user)
+        (std::string, sha1)
+        (std::string, parent)
+        (int, is_group)
+        (int, deletion_mark)
+        (int, version)
+);
+
+BOOST_FUSION_DEFINE_STRUCT(
+        (arcirk::database), certificates,
+        (int, _id)
+        (std::string, first)
+        (std::string, second)
+        (std::string, ref)
+        (std::string, cache)
+        (ByteArray, data)
+        (std::string, private_key)
+        (std::string, subject)
+        (std::string, issuer)
+        (std::string, not_valid_before)
+        (std::string, not_valid_after)
+        (std::string, parent_user)
+        (std::string, serial)
+        (std::string, suffix)
+        (std::string, sha1)
+        (std::string, parent)
+        (int, is_group)
+        (int, deletion_mark)
+        (int, version)
+);
+
+BOOST_FUSION_DEFINE_STRUCT(
+        (arcirk::database), cert_users,
+        (int, _id)
+        (std::string, first)
+        (std::string, second)
+        (std::string, ref)
+        (std::string, cache)
+        (std::string, uuid)
+        (std::string, sid)
+        (std::string, host)
+        (std::string, parent)
+        (int, is_group)
+        (int, deletion_mark)
+        (int, version)
+);
+
 namespace arcirk::database {
     enum tables{
         tbUsers,
@@ -559,6 +630,10 @@ namespace arcirk::database {
         tbNomenclature,
         tbDatabaseConfig,
         tbBarcodes,
+        tbDocumentsMarkedTables,
+        tbCertificates,
+        tbCertUsers,
+        tbContainers,
         tables_INVALID=-1,
     };
 
@@ -578,6 +653,10 @@ namespace arcirk::database {
         {tbNomenclature, "Nomenclature"}  ,
         {tbDatabaseConfig, "DatabaseConfig"}  ,
         {tbBarcodes, "Barcodes"}  ,
+        {tbDocumentsMarkedTables, "DocumentsMarkedTables"}  ,
+        {tbCertificates, "Certificates"}  ,
+        {tbCertUsers, "CertUsers"}  ,
+        {tbContainers, "Containers"}  ,
     })
 }
 
@@ -610,6 +689,56 @@ namespace arcirk {
 
         return result;
     }
+
+    static inline nlohmann::json json_keys(const nlohmann::json& object){
+        if(!object.is_object())
+            return nlohmann::json::array();
+        else{
+            auto result = nlohmann::json::array();
+            auto items = object.items();
+            for (auto itr = items.begin(); itr != items.end(); ++itr) {
+                result.push_back(itr.key());
+            }
+            return result;
+        }
+    }
+}
+
+BOOST_FUSION_DEFINE_STRUCT(
+    (arcirk::cryptography), cert_info,
+    (std::string, serial)
+    (std::string, issuer)
+    (std::string, subject)
+    (std::string, not_valid_before)
+    (std::string, not_valid_after)
+    (ByteArray, data)
+    (std::string, sha1)
+    (std::string, suffix)
+)
+
+namespace arcirk::command_line {
+    enum CmdCommand{
+        echoSystem,
+        echoUserName,
+        wmicGetSID,
+        echoGetEncoding,
+        csptestGetConteiners,
+        csptestContainerCopy,
+        csptestContainerFnfo,
+        csptestContainerDelete,
+        csptestGetCertificates,
+        certutilGetCertificateInfo,
+        certmgrInstallCert,
+        certmgrExportlCert,
+        certmgrDeletelCert,
+        certmgrGetCertificateInfo,
+        cryptcpCopycert,
+        mstscAddUserToConnect,
+        mstscEditFile,
+        quserList,
+        mstscRunAsAdmin,
+        COMMAND_INVALID=-1,
+    };
 }
 
 

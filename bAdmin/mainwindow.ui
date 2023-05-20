@@ -207,6 +207,9 @@
        </item>
        <item>
         <widget class="QToolButton" name="btnSendClientRelease">
+         <property name="toolTip">
+          <string>Загрузить новую версию мобильного приложения</string>
+         </property>
          <property name="text">
           <string>...</string>
          </property>
@@ -305,13 +308,6 @@
          </property>
          <property name="autoRaise">
           <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="btnSendoToClient">
-         <property name="text">
-          <string>Команда клиенту</string>
          </property>
         </widget>
        </item>

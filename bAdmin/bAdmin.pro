@@ -1,5 +1,6 @@
 QT += core gui sql svg
 QT += websockets network
+QT += core5compat
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -10,6 +11,10 @@ CONFIG += c++17
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    commandline.cpp \
+    commandlineparser.cpp \
+    cryptcertificate.cpp \
+    cryptcontainer.cpp \
     dialogselectinlist.cpp \
     connectiondialog.cpp \
     dialogabout.cpp \
@@ -29,6 +34,10 @@ SOURCES += \
     websocketclient.cpp
 
 HEADERS += \
+    commandline.h \
+    commandlineparser.h \
+    cryptcertificate.h \
+    cryptcontainer.h \
     dialogselectinlist.h \
     connectiondialog.h \
     dialogdevice.h \

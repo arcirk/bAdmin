@@ -57,6 +57,30 @@ void WebSocketClient::get_server_configuration_sync()
 
 }
 
+arcirk::client::client_param WebSocketClient::parse_client_param(const std::string &response)
+{
+    using json = nlohmann::json;
+
+    arcirk::client::client_param result;
+
+    try {
+        result = pre::json::from_json<arcirk::client::client_param>(json::parse(response));
+    } catch (...) {
+        auto tmp_struct = json::parse(response);
+        auto tmp = pre::json::to_json(arcirk::client::client_param());
+        auto items = tmp_struct.items();
+        for (auto it = items.begin(); it != items.end() ; ++it) {
+            if(tmp.find(it.key()) != tmp.end())
+                tmp[it.key()] = it.value();
+        }
+        result = pre::json::from_json<arcirk::client::client_param>(tmp);
+        result.version = CLIENT_VERSION;
+
+    }
+
+    return result;
+}
+
 std::string WebSocketClient::crypt(const QString &source, const QString &key)
 {
     if(source.isEmpty())
@@ -174,7 +198,8 @@ void WebSocketClient::parse_response(const QString &resp)
             if(msg.message == "OK"){
                 get_server_configuration_sync();
                 QString result = QByteArray::fromBase64(msg.param.data());
-                auto param = pre::json::from_json<arcirk::client::client_param>(result.toStdString());
+                //auto param = pre::json::from_json<arcirk::client::client_param>(result.toStdString());
+                auto param = parse_client_param(result.toStdString());
                 m_currentSession = QUuid::fromString(QString::fromStdString(param.session_uuid));
                 m_currentUserUuid = QUuid::fromString(QString::fromStdString(param.user_uuid));
                 doConnectionSuccess();
@@ -239,11 +264,8 @@ void WebSocketClient::doConnectionChanged(bool state)
     emit connectionChanged(state);
 }
 
-nlohmann::json WebSocketClient::exec_http_query(const std::string &command, const nlohmann::json &param)
+nlohmann::json WebSocketClient::exec_http_query(const std::string &command, const nlohmann::json &param, const ByteArray& data)
 {
-    auto http_param = arcirk::synchronize::http_param();
-    http_param.command = command;
-    http_param.param = QByteArray(param.dump().data()).toBase64().toStdString();
 
     QEventLoop loop;
     int httpStatus = 200;
@@ -278,8 +300,8 @@ nlohmann::json WebSocketClient::exec_http_query(const std::string &command, cons
     QString headerData = "Token " + QByteArray(conf_.hash.data()).toBase64();;
     request.setRawHeader("Authorization", headerData.toLocal8Bit());
 
-    if(field_is_exists(param, "data")){
-        ByteArray bt = param["data"];
+    if(data.size() > 0){
+        //ByteArray bt = param["data"];
         QStringList contentDisposition{"form-data"};
         auto items = param.items();
         for (auto itr = items.begin(); itr != items.end(); ++itr) {
@@ -288,11 +310,14 @@ nlohmann::json WebSocketClient::exec_http_query(const std::string &command, cons
                 contentDisposition.append(QString("%1=\"%2\"").arg(val.key().c_str(), val.value().get<std::string>().c_str()));
             }
         }
-       request.setRawHeader("Content-Disposition", contentDisposition.join(";").toLocal8Bit());
-        QByteArray* q_data = new QByteArray(reinterpret_cast<const char*>(bt.data()), bt.size());
+        request.setRawHeader("Content-Disposition", contentDisposition.join(";").toLocal8Bit());
+        QByteArray* q_data = new QByteArray(reinterpret_cast<const char*>(data.data()), data.size());
         request.setHeader(QNetworkRequest::ContentTypeHeader, "multipart/form-data");
         httpService.post(request, *q_data);
     }else{
+        auto http_param = arcirk::synchronize::http_param();
+        http_param.command = command;
+        http_param.param = QByteArray(param.dump().data()).toBase64().toStdString();
         request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
         httpService.post(request, QByteArray::fromStdString(pre::json::to_json(http_param).dump()));
     }

@@ -38,7 +38,7 @@ public:
     void command_to_client(const std::string &receiver, const std::string &command,
                                          const nlohmann::json &param = {});
 
-    nlohmann::json exec_http_query(const std::string& command, const nlohmann::json& param);
+    nlohmann::json exec_http_query(const std::string& command, const nlohmann::json& param, const ByteArray& data = {});
 
     static std::string crypt(const QString &source, const QString &key);
 
@@ -86,6 +86,8 @@ private:
 
 
     void get_server_configuration_sync();
+
+    static arcirk::client::client_param parse_client_param(const std::string& response);
 
 signals:
     void displayError(const QString& what, const QString& err);

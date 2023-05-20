@@ -200,6 +200,7 @@ TreeViewModel::TreeViewModel(const arcirk::client::client_conf& conf, QObject *p
 
     is_loaded_ = false;
     column_aliases = {};
+    server_object_ = arcirk::server::server_objects::OBJ_INVALID;
 }
 
 struct TreeViewModel::NodeInfo
