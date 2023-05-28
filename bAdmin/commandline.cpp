@@ -15,7 +15,7 @@ CommandLine::CommandLine(QObject *parent)
 
     m_listening = false;
     m_command = COMMAND_INVALID;
-    program = "powershell";
+    program = "cmd"; //"powershell";
 
     codec866 = QTextCodec::codecForName("CP866");
     codec = QTextCodec::codecForName("CP1251");
@@ -25,6 +25,11 @@ CommandLine::CommandLine(QObject *parent)
 bool CommandLine::listening()
 {
     return m_listening;
+}
+
+void CommandLine::setWorkingDirectory(const QString &value)
+{
+    m_process.setWorkingDirectory(value);
 }
 
 void CommandLine::start()
@@ -60,27 +65,9 @@ void CommandLine::send(const QString &commandText, CmdCommand cmd)
     _lastCommand = _commandText;
 
     m_command = cmd;
-//    if(!useSystem()){
-        if(m_listening){
-//            if(_currentEncoding.isEmpty()){
-//                _currentEncoding = "CP866";
-//                codec = QTextCodec::codecForName(_currentEncoding.toUtf8());
-//                QTextCodec::setCodecForLocale(codec);
-//            }
-//            try {
-                //auto cmd_ = codec->fromUnicode(_commandText);
-               // m_process.write(_commandText.toLocal8Bit());
-                m_process.write(codec866->fromUnicode(_commandText));
-               // m_process.write(_commandText.toUtf8());
-//            }  catch (std::exception& e) {
-//                qCritical() << __FUNCTION__ << e.what();
-//            }
+    if(m_listening)
+        m_process.write(codec866->fromUnicode(_commandText));
 
-        }
-//    }else{
-//        std::string _result = executeSystem(_commandText.toStdString());
-//        emit output(QString::fromStdString(_result), command);
-//    }
 }
 
 void CommandLine::onParse(const QVariant &result, CmdCommand cmd)
@@ -110,8 +97,6 @@ void CommandLine::readyReadStandardError()
     if(!m_listening) return;
 
     QByteArray data = m_process.readAllStandardError();
-//    QString message = encodeData(data, _method);
-
     emit error(data, m_command);
 }
 
@@ -149,7 +134,5 @@ void CommandLine::readyRead()
     if(!m_listening) return;
 
     QByteArray data = m_process.readAll();
-    //auto result = codec->toUnicode(data);// QString(data).toLocal8Bit();
-    //emit output(result, m_command);
     emit output(data, m_command);
 }

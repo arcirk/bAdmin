@@ -16,6 +16,7 @@ class CommandLine : public QObject
 public:
     explicit CommandLine(QObject *parent = nullptr);
     bool listening();
+    void setWorkingDirectory(const QString& value);
 
 public slots:
     void start();

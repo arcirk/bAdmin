@@ -40,6 +40,8 @@ public:
 
     nlohmann::json exec_http_query(const std::string& command, const nlohmann::json& param, const ByteArray& data = {});
 
+    QByteArray exec_http_query_get(const std::string& command, const nlohmann::json& param);
+
     static std::string crypt(const QString &source, const QString &key);
 
     static arcirk::client::version_application get_version(){

@@ -1,5 +1,34 @@
 #include "commandlineparser.h"
 #include <QDebug>
+#include <QRegularExpression>
+#include <QStringLiteral>
+#include <QDir>
+
+void certInfoRUtoEN(QString& info){
+
+    QMap<QString, QString> ru;
+    ru.insert("Издатель", "Issuer");
+    ru.insert("Субъект", "Subject");
+    ru.insert("Серийный номер", "Serial");
+    ru.insert("SHA1 отпечаток", "SHA1 Hash");
+    ru.insert("Идентификатор ключа", "SubjKeyID");
+    ru.insert("Алгоритм подписи", "Signature Algorithm");
+    ru.insert("Алгоритм откр. кл.", "PublicKey Algorithm");
+    ru.insert("Выдан", "Not valid before");
+    ru.insert("Истекает", "Not valid after");
+    ru.insert("Ссылка на ключ", "PrivateKey Link");
+    ru.insert("Контейнер", "Container");
+    ru.insert("Имя провайдера", "Provider Name");
+    ru.insert("Инфо о провайдере", "Provider Info");
+    ru.insert("URL сертификата УЦ", "CA cert URL");
+    ru.insert("URL списка отзыва", "CDP");
+    ru.insert("Назначение/EKU", "Extended Key Usage");
+
+    for(auto itr = ru.constBegin(); itr != ru.constEnd(); itr++){
+        info.replace(itr.key(), itr.value());
+    }
+
+}
 
 CommandLineParser::CommandLineParser(QObject *parent)
     : QObject{parent}
@@ -50,14 +79,9 @@ nlohmann::json CommandLineParser::parse(const QString &response, CmdCommand comm
                             if(ind > 0){
                                 auto dt = getLine(response, ind).trimmed();
                                 obj["not_valid_before"] = dt.right(dt.length() - QString("NotBefore:").length()).trimmed().toStdString();
-                                //dt = dt.mid(dt.lastIndexOf("NotBefore:"));
-                                //auto s_r = getLine(response, ind).trimmed().split(":");
-                                //obj["not_valid_before"] = s_r[1].trimmed().toStdString();
                             }
                             ind = response.indexOf("NotAfter:");
                             if(ind > 0){
-//                                auto s_r = getLine(response, ind).trimmed().split(":");
-//                                obj["not_valid_after"] = s_r[1].trimmed().toStdString();
                                 auto dt = getLine(response, ind).trimmed();
                                 obj["not_valid_after"] = dt.right(dt.length() - QString("NotAfter:").length()).trimmed().toStdString();
                             }
@@ -87,23 +111,125 @@ nlohmann::json CommandLineParser::parse(const QString &response, CmdCommand comm
                 }
             }
         }else if(command == wmicGetSID){
-//            QString str(result);
-//            QRegularExpression  re( "S-1");
-//            int length = QString("S-1").length();
-//            int l = result.lastIndexOf(re, length);
-//            int in = result.indexOf(re, length);
-//            int fwd = l > in ? l : in;
-//            if(fwd >= 0){
-//                for(int i = fwd; i < str.length(); ++i){
-//                    QString s = str.mid(i, 1);
-//                    if(s == " " || s == "\n" || s == "\r"){
-//                        QString _res = str.mid(fwd, i - fwd);
-//                        emit endParse(_res, command);
-//                        break;
-//                    }
-//                }
-//            }
+            auto obj = json::object();
+            auto lst = response.split("\n");
+            for (int i = lst.size() - 1; i > 0; --i) {
+                if(lst[i].indexOf("S-1") != -1){
+                    auto details = lst[i].split(" ");
+                    if(details.size() == 2){
+                        obj["user"] = details[0].replace("\r", "").trimmed().toStdString();
+                        obj["sid"] = details[1].trimmed().toStdString();
+                    }
+                    break;
+                }
+            }
+            return obj;
+        }else if(command == csptestGetCertificates || command == certmgrGetCertificateInfo){
+
+            int ind = response.indexOf("[ErrorCode: 0x00000000]");
+            if(ind > 0){
+
+                QString str = response;
+
+                QStringList results;
+                int j = str.length(); //0;
+                int endIndex = str.length();
+
+                while ((j = str.lastIndexOf("Issuer", j)) != -1) {
+
+                        if(j > 0){
+                            results.append(str.mid(j, endIndex - j));
+                        }
+                        --j;
+                        endIndex = j;
+                }
+
+                auto arr = nlohmann::json::array();
+
+                foreach(auto certText, results){
+                    QStringList l = certText.split("\n");
+                    QString p;
+                    auto obj = nlohmann::json::object();
+
+                    foreach(auto line, l){
+                        QStringList s = certText.split(":");
+                        if(s.size() < 2){
+                            continue;
+                        }
+                        int ind = line.indexOf(":");
+                        if(ind != -1){
+                            obj[line.left(ind - 1).trimmed().toStdString()] = line.right(line.length() - 1 - ind).trimmed().toStdString();
+                            p.append(line + "\n");
+                        }
+                    }
+
+                    arr += obj;
+                }
+
+                return arr;
+            }else
+                return {};
+
+        }else if(command == csptestGetConteiners){
+            int ind = response.indexOf("[ErrorCode: 0x00000000]");
+            if(ind > 0){
+                QString tmp(response);
+                int l = tmp.indexOf("\\\\.\\");
+                int e = tmp.lastIndexOf("OK.");
+
+                auto obj = nlohmann::json::object();
+                obj["columns"] = json{
+                    "name", "volume", "type"
+                };
+                if(l > 0 && e > 0 && l < e){
+                    tmp = tmp.mid(l, e - l);
+                }
+                tmp.replace("\r", "");
+                QStringList keys = tmp.split("\n");
+
+                static QRegularExpression re(QStringLiteral ("[^/]+$"));
+                auto rows = nlohmann::json::array();
+                foreach (auto key, keys) {
+                    auto row = json::object();
+                    auto m = re.match(QDir::fromNativeSeparators(key));
+                    if(m.hasMatch()){
+                        auto name = m.captured(0);
+                        auto vol = key.left(key.length() - name.length());
+                        auto type = arcirk::cryptography::type_storgare(vol.toStdString());
+                        row["name"] = name.toStdString();
+                        row["volume"] = vol.toStdString();
+                        row["type"] = type;
+                        rows += row;
+                    }
+                }
+
+                obj["rows"] = rows;
+                return obj;
+            }else
+                return {};
+        }else if(command == csptestContainerFnfo){
+            int ind = response.indexOf("KP_CERTIFICATE:");
+            if(ind > 0){
+                QString _str = response.right(response.length() - ind);
+                int pKey = _str.indexOf("PrivKey:");
+                int endpKey = _str.indexOf("\n", pKey);
+                QString _info = _str.left(pKey);
+                QString tmp = _str.mid(pKey, endpKey - pKey);
+                _info.append("\n" + tmp);
+                return _info.toStdString();
+            }
         }
+//        else if(command == csptestContainerCopy){
+//           int ind = result.indexOf("[ErrorCode: 0x00000000]");
+//           if(ind > 0){
+//                emit endParse("OK", command);
+//           }
+//        }else if(command == csptestContainerDelete){
+//            int ind = result.indexOf("[ErrorCode: 0x00000000]");
+//            if(ind > 0){
+//                 emit endParse("OK", command);
+//            }
+//        }
 
     } catch (const std::exception& e) {
 

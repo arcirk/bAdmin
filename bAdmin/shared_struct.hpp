@@ -16,10 +16,18 @@
 #include <string>
 #include <fstream>
 #include <sstream>
+#include <boost/locale.hpp>
+#include <boost/algorithm/string.hpp>
 
 #define ARCIRK_VERSION "1.1.0"
 #define CONF_FILENAME "b_admin_conf.json"
 #define CLIENT_VERSION 2
+
+#define FAT12          "FAT12"
+#define REGISTRY       "REGISTRY"
+#define HDIMAGE        "HDIMAGE"
+#define DATABASE       "DATABASE"
+#define REMOTEBASE     "REMOTEBASE"
 
 typedef unsigned char BYTE;
 typedef std::vector<BYTE> ByteArray;
@@ -84,6 +92,30 @@ namespace arcirk{
         fclose(fp);
 
         result = v;
+    }
+
+    inline std::string from_utf(const std::string& source){
+#ifdef BOOST_WINDOWS
+        return boost::locale::conv::from_utf(source, "windows-1251");
+#else
+        return source;
+#endif
+    }
+
+    inline std::string to_utf(const std::string& source, const std::string& ch = "windows-1251"){
+#ifdef BOOST_WINDOWS
+        return boost::locale::conv::to_utf<char>(source, ch);
+#else
+        return source;
+#endif
+    }
+
+    inline int index_of(const std::string& original_string, const std::string& source){
+        auto find = original_string.find(source);
+        if(find == std::string::npos)
+            return - 1;
+        else
+            return (int)find;
     }
 }
 
@@ -245,6 +277,11 @@ namespace arcirk::server{
         Containers,
         Certificates,
         CertUsers,
+        LocalhostUser,
+        LocalhostUserCertificates,
+        LocalhostUserContainers,
+        LocalhostUserContainersRegistry,
+        LocalhostUserContainersVolume,
         OBJ_INVALID=-1,
     };
 
@@ -262,6 +299,11 @@ namespace arcirk::server{
         {Containers, "Containers"},
         {Certificates, "Certificates"},
         {CertUsers, "CertUsers"},
+        {LocalhostUser, "LocalhostUser"},
+        {LocalhostUserCertificates, "LocalhostUserCertificates"},
+        {LocalhostUserContainers, "LocalhostUserContainers"},
+        {LocalhostUserContainersRegistry, "LocalhostUserContainersRegistry"},
+        {LocalhostUserContainersVolume, "LocalhostUserContainersVolume"},
     });
 
     enum application_names{
@@ -658,6 +700,202 @@ namespace arcirk::database {
         {tbCertUsers, "CertUsers"}  ,
         {tbContainers, "Containers"}  ,
     })
+
+    static inline nlohmann::json table_default_json(arcirk::database::tables table) {
+
+          //using namespace arcirk::database;
+          switch (table) {
+              case tbUsers:{
+                  auto usr_info = user_info();
+                  usr_info.ref = arcirk::uuids::nil_string_uuid();
+                  usr_info.parent = arcirk::uuids::nil_string_uuid();
+                  usr_info.is_group = 0;
+                  usr_info.deletion_mark = 0;
+                  return pre::json::to_json(usr_info);
+              }
+              case tbMessages:{
+                  auto tbl = messages();
+                  tbl.ref = arcirk::uuids::nil_string_uuid();
+                  tbl.content_type ="Text";
+                  tbl.parent = arcirk::uuids::nil_string_uuid();
+                  tbl.is_group = 0;
+                  tbl.deletion_mark = 0;
+                  return pre::json::to_json(tbl);
+                  //std::string tbl_json = to_string(pre::json::to_json(tbl));
+                  //return tbl_json;
+              }
+              case tbOrganizations:{
+                  auto tbl = organizations();
+                  tbl.ref = arcirk::uuids::nil_string_uuid();
+                  tbl.parent = arcirk::uuids::nil_string_uuid();
+                  tbl.is_group = 0;
+                  tbl.deletion_mark = 0;
+                  return pre::json::to_json(tbl);
+    //                std::string tbl_json = to_string(pre::json::to_json(tbl));
+    //                return tbl_json;
+              }
+              case tbSubdivisions:{
+                  auto tbl = subdivisions();
+                  tbl.ref = arcirk::uuids::nil_string_uuid();
+                  tbl.parent = arcirk::uuids::nil_string_uuid();
+                  tbl.is_group = 0;
+                  tbl.deletion_mark = 0;
+                  return pre::json::to_json(tbl);
+    //                std::string tbl_json = to_string(pre::json::to_json(tbl));
+    //                return tbl_json;
+              }
+              case tbWarehouses:{
+                  auto tbl = warehouses();
+                  tbl.ref = arcirk::uuids::nil_string_uuid();
+                  tbl.parent = arcirk::uuids::nil_string_uuid();
+                  tbl.is_group = 0;
+                  tbl.deletion_mark = 0;
+                  return pre::json::to_json(tbl);
+    //                std::string tbl_json = to_string(pre::json::to_json(tbl));
+    //                return tbl_json;
+              }
+              case tbPriceTypes:{
+                  auto tbl = price_types();
+                  tbl.ref = arcirk::uuids::nil_string_uuid();
+                  tbl.parent = arcirk::uuids::nil_string_uuid();
+                  tbl.is_group = 0;
+                  tbl.deletion_mark = 0;
+                  return pre::json::to_json(tbl);
+    //                std::string tbl_json = to_string(pre::json::to_json(tbl));
+    //                return tbl_json;
+              }
+              case tbWorkplaces:{
+                  auto tbl = workplaces();
+                  tbl.ref = arcirk::uuids::nil_string_uuid();
+                  tbl.server = arcirk::uuids::nil_string_uuid();
+                  tbl.parent = arcirk::uuids::nil_string_uuid();
+                  tbl.is_group = 0;
+                  tbl.deletion_mark = 0;
+                  return pre::json::to_json(tbl);
+    //                std::string tbl_json = to_string(pre::json::to_json(tbl));
+    //                return tbl_json;
+              }
+              case tbDevices:{
+                  auto tbl = devices();
+                  tbl.ref = arcirk::uuids::nil_string_uuid();
+                  tbl.deviceType = "Desktop";
+                  tbl.address = "127.0.0.1";
+                  tbl.workplace = arcirk::uuids::nil_string_uuid();
+                  tbl.price_type = arcirk::uuids::nil_string_uuid();
+                  tbl.warehouse = arcirk::uuids::nil_string_uuid();
+                  tbl.subdivision = arcirk::uuids::nil_string_uuid();
+                  tbl.organization = arcirk::uuids::nil_string_uuid();
+                  tbl.parent = arcirk::uuids::nil_string_uuid();
+                  tbl.is_group = 0;
+                  tbl.deletion_mark = 0;
+                  return pre::json::to_json(tbl);
+    //                std::string tbl_json = to_string(pre::json::to_json(tbl));
+    //                return tbl_json;
+              }
+              case tbDocumentsTables: {
+                  auto tbl = document_table();
+                  tbl.ref = arcirk::uuids::nil_string_uuid();
+                  tbl.price = 0;
+                  tbl.quantity = 0;
+                  tbl.parent = arcirk::uuids::nil_string_uuid();
+                  tbl.is_group = 0;
+                  tbl.deletion_mark = 0;
+                  return pre::json::to_json(tbl);
+    //                std::string tbl_json = to_string(pre::json::to_json(tbl));
+    //                return tbl_json;
+              }
+              case tbDocumentsMarkedTables: {
+//                  auto tbl = document_marked_table();
+//                  tbl.ref = arcirk::uuids::nil_string_uuid();
+//                  tbl.quantity = 1;
+//                  tbl.document_ref = arcirk::uuids::nil_string_uuid();
+//                  tbl.parent = arcirk::uuids::nil_string_uuid();
+//                  tbl.is_group = 0;
+//                  tbl.deletion_mark = 0;
+//                  return pre::json::to_json(tbl);
+                    break;
+              }
+              case tbDocuments: {
+//                  auto tbl = documents();
+//                  tbl.ref = arcirk::uuids::nil_string_uuid();
+//                  tbl.device_id = arcirk::uuids::nil_string_uuid();
+//                  tbl.date = date_to_seconds();
+//                  tbl.parent = arcirk::uuids::nil_string_uuid();
+//                  tbl.is_group = 0;
+//                  tbl.deletion_mark = 0;
+//                  return pre::json::to_json(tbl);
+                    break;
+              }
+              case tbNomenclature: {
+                  auto tbl = nomenclature();
+                  tbl.ref = arcirk::uuids::nil_string_uuid();
+                  tbl.parent = arcirk::uuids::nil_string_uuid();
+                  tbl.is_group = 0;
+                  tbl.deletion_mark = 0;
+                  return pre::json::to_json(tbl);
+              }
+              case tbBarcodes: {
+                  auto tbl = barcodes();
+                  tbl.ref = arcirk::uuids::nil_string_uuid();
+                  tbl.parent = arcirk::uuids::nil_string_uuid();
+                  tbl.is_group = 0;
+                  tbl.deletion_mark = 0;
+                  tbl.version = 0;
+                  return pre::json::to_json(tbl);
+              }
+              case tbDatabaseConfig: {
+//                  auto tbl = database_config();
+//                  tbl.ref = arcirk::uuids::nil_string_uuid();
+//                  tbl.version = 0;
+//                  return pre::json::to_json(tbl);
+                    break;
+              }
+              case tbCertificates: {
+                  auto tbl = certificates();
+                  tbl.ref = arcirk::uuids::nil_string_uuid();
+                  tbl.parent = arcirk::uuids::nil_string_uuid();
+                  tbl.is_group = 0;
+                  tbl.deletion_mark = 0;
+                  tbl.version = 0;
+                  tbl._id = 0;
+                  return pre::json::to_json(tbl);
+              }
+              case tbCertUsers: {
+                  auto tbl = cert_users();
+                  tbl.ref = arcirk::uuids::nil_string_uuid();
+                  tbl.parent = arcirk::uuids::nil_string_uuid();
+                  tbl.is_group = 0;
+                  tbl.deletion_mark = 0;
+                  tbl.version = 0;
+                  return pre::json::to_json(tbl);
+              }
+              case tbContainers: {
+                  auto tbl = containers();
+                  tbl.ref = arcirk::uuids::nil_string_uuid();
+                  tbl.parent = arcirk::uuids::nil_string_uuid();
+                  tbl.is_group = 0;
+                  tbl.deletion_mark = 0;
+                  tbl.version = 0;
+                  return pre::json::to_json(tbl);
+              }
+              case tables_INVALID:{
+                  break;
+              }
+              case tbDevicesType:
+                  //return devices_type();
+                break;
+          }
+
+          return {};
+      }
+
+    template<typename T>
+    static inline T table_default_struct(arcirk::database::tables table){
+        auto j = table_default_json(table);
+        auto result = pre::json::from_json<T>(j);
+        return result;
+    }
+
 }
 
 #define ARR_SIZE(x) (sizeof(x) / sizeof(x[0]))
@@ -716,6 +954,22 @@ BOOST_FUSION_DEFINE_STRUCT(
     (std::string, suffix)
 )
 
+BOOST_FUSION_DEFINE_STRUCT(
+    (arcirk::cryptography), cont_info,
+    (ByteArray, header_key)
+    (ByteArray, masks_key)
+    (ByteArray, masks2_key)
+    (ByteArray, name_key)
+    (ByteArray, primary_key)
+    (ByteArray, primary2_key)
+)
+
+BOOST_FUSION_DEFINE_STRUCT(
+    (arcirk::cryptography), win_user_info,
+    (std::string, user)
+    (std::string, sid)
+)
+
 namespace arcirk::command_line {
     enum CmdCommand{
         echoSystem,
@@ -737,9 +991,46 @@ namespace arcirk::command_line {
         mstscEditFile,
         quserList,
         mstscRunAsAdmin,
+        cmdCD,
+        cmdEXIT,
         COMMAND_INVALID=-1,
     };
 }
+namespace arcirk::cryptography{
 
+    enum TypeOfStorgare{
+        storgareTypeRegistry,
+        storgareTypeLocalVolume,
+        storgareTypeDatabase,
+        storgareTypeRemoteBase,
+        storgareTypeUnknown = -1
+    };
+
+    NLOHMANN_JSON_SERIALIZE_ENUM(TypeOfStorgare,{
+           {storgareTypeRegistry, REGISTRY},
+           {storgareTypeLocalVolume, FAT12},
+           {storgareTypeDatabase, DATABASE},
+           {storgareTypeRemoteBase, REMOTEBASE},
+    })
+
+    inline TypeOfStorgare type_storgare(const std::string& source){
+        if(source.empty())
+            return storgareTypeUnknown;
+        else{
+            if(index_of(source, FAT12) != -1 || index_of(source, HDIMAGE) != -1)
+                return storgareTypeLocalVolume;
+            else if(index_of(source, REGISTRY) != -1)
+                return storgareTypeRegistry;
+            else if(index_of(source, DATABASE) != -1)
+                return storgareTypeDatabase;
+            else if(index_of(source, REMOTEBASE) != -1)
+                return storgareTypeDatabase;
+            else{
+                return storgareTypeUnknown;
+            }
+        }
+    }
+
+}
 
 #endif // SHARED_STRUCT_HPP

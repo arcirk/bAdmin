@@ -103,10 +103,6 @@ bool CryptCertificate::fromFile(const QString &path)
     cmd.start();
     loop.exec();
 
-    //qDebug() << qPrintable(cmd_text);
-
-    //qDebug() << qPrintable(codec->toUnicode(cmd_text));
-
     result = CommandLineParser::parse(codec->toUnicode(cmd_text), CmdCommand::certutilGetCertificateInfo);
 
     if(result.empty() || !result.is_object())
@@ -206,6 +202,49 @@ std::string CryptCertificate::parent() const
 std::string CryptCertificate::dump() const
 {
     return pre::json::to_json(cert_struct).dump();
+}
+
+void CryptCertificate::load_response(arcirk::database::certificates& result, const nlohmann::json& object)
+{
+    //result.first = object.value()
+    result.issuer = object.value("Issuer", "");
+    if(!result.issuer.empty()){
+        QString issuer(result.issuer.c_str());
+        auto lst = issuer.split(",");
+        QMap<QString,QString> m_lst;
+        foreach(auto str, lst){
+            if(str.indexOf("=") !=-1){
+                auto ind = str.split("=");
+                auto second = ind[1].trimmed();
+                if(second[0] == '"'){
+                    //second = second.mid(1, second.length() - 1);
+                    second.remove('\"');
+                }
+                m_lst.insert(ind[0].trimmed(), second);
+            }
+        }
+
+        result.first = m_lst["CN"].toStdString();
+    }
+    result.subject = object.value("Subject", "");
+    if(!result.issuer.empty()){
+        QString issuer(result.issuer.c_str());
+        auto lst = issuer.split(",");
+        QMap<QString,QString> m_lst;
+        foreach(auto str, lst){
+            if(str.indexOf("=") !=-1){
+                auto ind = str.split("=");
+                m_lst.insert(ind[0].trimmed(), ind[1].trimmed());
+            }
+        }
+        result.second = m_lst["CN"].toStdString();
+        result.parent_user = m_lst["SN"].toStdString() + " " + m_lst["G"].toStdString();
+    }
+    result.private_key = object.value("Container", "");
+    result.not_valid_before = object.value("Not valid before", "");
+    result.not_valid_after = object.value("Not valid after", "");
+    result.serial = object.value("Serial", "");
+    result.sha1 = object.value("SHA1 Hash", "");
 }
 
 nlohmann::json CryptCertificate::parse_details(const std::string &details) const

@@ -603,10 +603,10 @@ void QJsonTableModel::insertRow(int pos, const QString &rowJson)
     m_json.insert(pos, obj);
 }
 
-void QJsonTableModel::addRow(const QString& barcode, const QString& parent, int quantity)
-{
+//void QJsonTableModel::addRow(const QString& barcode, const QString& parent, int quantity)
+//{
 
-}
+//}
 
 void QJsonTableModel::moveTop(int row)
 {

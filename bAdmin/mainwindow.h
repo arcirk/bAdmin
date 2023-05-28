@@ -13,10 +13,10 @@
 #include <QMenu>
 #include <QCloseEvent>
 #include <QStandardItemModel>
-//#include "qjsontablemodel.h"
-//#include "qproxymodel.h"
 #include "shared_struct.hpp"
 #include "treeviewmodel.h"
+#include "certuser.h"
+#include "cryptcontainer.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -65,13 +65,18 @@ private slots:
 
     void on_btnSendoToClient_clicked();
 
+    void on_btnInfo_clicked();
+
 private:
-    Ui::MainWindow *                                        ui;
-    WebSocketClient *                                       m_client;
-    QLabel *                                                infoBar;
-    QMap<arcirk::server::server_objects, TreeViewModel*>    m_models;
-    QMap<QString, QString>                                  m_colAliases;
-    QMap<arcirk::server::application_names, QPair<QIcon, QIcon>> app_icons;
+    Ui::MainWindow *                         ui;
+    WebSocketClient *                        m_client;
+    QLabel *                                 infoBar;
+    QMap<arcirk::server::server_objects,
+    TreeViewModel*>                          m_models;
+    QMap<QString, QString>                   m_colAliases;
+    QMap<arcirk::server::application_names,
+    QPair<QIcon, QIcon>>                     app_icons;
+    CertUser *                               current_user;
 
     void createModels();
     void createColumnAliases();
@@ -92,6 +97,7 @@ private:
 
     void tableSetModel(const QString& key);
     void tableResetModel(arcirk::server::server_objects key, const QByteArray& resp = "");
+    void resetModel(arcirk::server::server_objects key, const nlohmann::json& data);
 
     void fillDefaultTree();
 
@@ -99,6 +105,8 @@ private:
 
     //
     void update_icons(arcirk::server::server_objects key, TreeViewModel* model);
+
+    void insert_container(CryptContainer& cnt);
 
 signals:
     void setConnectionChanged(bool state);

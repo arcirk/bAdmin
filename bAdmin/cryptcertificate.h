@@ -29,6 +29,8 @@ public:
     std::string parent() const;
     std::string dump() const;
 
+    static void load_response(arcirk::database::certificates& result, const nlohmann::json& object);
+
 private:
     arcirk::database::certificates cert_struct;
     bool is_valid;

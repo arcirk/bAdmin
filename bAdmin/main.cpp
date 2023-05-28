@@ -3,6 +3,17 @@
 #include <QApplication>
 #include <QStyleFactory>
 
+#ifdef Q_OS_WINDOWS
+#include <Windows.h>
+#pragma comment(lib, "advapi32")
+#endif
+
+//#ifdef Q_OS_WINDOWS
+//    #pragma warning(disable:4100)
+//    #pragma warning(disable:4267)
+//    #pragma comment(lib, "advapi32")
+//#endif
+
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);

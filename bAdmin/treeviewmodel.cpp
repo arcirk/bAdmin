@@ -541,6 +541,7 @@ QString TreeViewModel::current_parent_path() const
 
 void TreeViewModel::refresh(const QModelIndex& parent)
 {
+    Q_UNUSED(parent);
 //    NodeInfo* parentInfo = static_cast<NodeInfo*>(parent.internalPointer());
 //    parentInfo->children.erase(parentInfo->children.cbegin(), parentInfo->children.cend());
 //    reset();

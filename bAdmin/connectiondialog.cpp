@@ -128,6 +128,7 @@ void ConnectionDialog::setConnectionState(bool newConnectionState)
 
 void ConnectionDialog::connectionChanged(bool state)
 {
+    Q_UNUSED(state);
     formControl();
 }
 

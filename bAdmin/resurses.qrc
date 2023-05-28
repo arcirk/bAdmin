@@ -143,5 +143,6 @@
         <file>img/pricechecker_32.png</file>
         <file>img/move_end.png</file>
         <file>img/startTask.png</file>
+        <file>img/save.png</file>
     </qresource>
 </RCC>

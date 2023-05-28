@@ -54,7 +54,7 @@ public:
     void addRow(const QJsonObject& row);
     void addRow(const QString& rowJson);
     void insertRow(int pos, const QString& rowJson);
-    Q_INVOKABLE void addRow(const QString& barcode, const QString& parent, int quantity);
+    //Q_INVOKABLE void addRow(const QString& barcode, const QString& parent, int quantity);
     Q_INVOKABLE void moveTop(int row);
 
     int row(const QPair<QString, QString>& key);

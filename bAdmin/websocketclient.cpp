@@ -26,6 +26,7 @@ WebSocketClient::WebSocketClient(QObject *parent)
 WebSocketClient::WebSocketClient(const QUrl &url, QObject *parent)
 : QObject{parent}
 {
+    Q_UNUSED(url);
     m_isConnected = false;
     read_conf();
     initialize();
@@ -348,17 +349,78 @@ nlohmann::json WebSocketClient::exec_http_query(const std::string &command, cons
 
 }
 
+QByteArray WebSocketClient::exec_http_query_get(const std::string &command, const nlohmann::json &param)
+{
+    QEventLoop loop;
+    int httpStatus = 200;
+    QByteArray httpData;
+    QNetworkAccessManager httpService;
+
+    auto finished = [&loop, &httpStatus, &httpData](QNetworkReply* reply) -> void
+    {
+       QVariant status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+       if(status_code.isValid()){
+           httpStatus = status_code.toInt();
+           if(httpStatus != 200){
+                qCritical() << QDateTime::currentDateTime().toString("hh:mm:ss") << __FUNCTION__ << "Error: " << httpStatus << " " + reply->errorString() ;
+           }else
+           {
+               httpData = reply->readAll();
+           }
+       }
+       loop.quit();
+
+    };
+    loop.connect(&httpService, &QNetworkAccessManager::finished, finished);
+
+    QUrl ws(conf_.server_host.data());
+    QString protocol = ws.scheme() == "wss" ? "https://" : "http://";
+    QString http_query = "/api/info";
+    QUrl url(protocol + ws.host() + ":" + QString::number(ws.port()) + http_query);
+    QNetworkRequest request(url);
+
+    QString headerData = "Token " + QByteArray(conf_.hash.data()).toBase64();;
+    request.setRawHeader("Authorization", headerData.toLocal8Bit());
+    if(command == "GetBlob"){
+        QStringList contentDisposition{"form-data"};
+        auto items = param.items();
+        for (auto itr = items.begin(); itr != items.end(); ++itr) {
+            auto val = *itr;
+            contentDisposition.append(QString("%1=\"%2\"").arg(val.key().c_str(), val.value().get<std::string>().c_str()));
+        }
+        request.setRawHeader("Content-Disposition", contentDisposition.join(";").toLocal8Bit());
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "multipart/form-data");
+    }else{
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    }
+
+    httpService.get(request);
+    loop.exec();
+
+    if(httpStatus != 200){
+        return {};
+    }
+
+    if(httpData.isEmpty())
+        return {};
+
+    if(httpData == "error"){
+        return {};
+    }
+
+    return httpData;
+
+}
+
 void WebSocketClient::send_command(server::server_commands cmd, const nlohmann::json &param)
 {
     qDebug() << QDateTime::currentDateTime().toString("hh:mm:ss") << __FUNCTION__ << QString::fromStdString(arcirk::enum_synonym(cmd));
     std::string p = QByteArray(param.dump().data()).toBase64().toStdString();
-    //QByteArray ba(p.c_str());
+
     nlohmann::json _param = {
         {arcirk::enum_synonym(cmd), p}
     };
-//    nlohmann::json _param = {
-//        {"parameters", p}
-//    };
+
     QString cmd_text = "cmd " + QString::fromStdString(arcirk::enum_synonym(cmd)) + " " + QString::fromStdString(_param.dump()).toUtf8().toBase64();
 
     m_client->sendTextMessage(cmd_text);

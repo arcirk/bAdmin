@@ -40,7 +40,7 @@ void DialogServers::accept()
 
 void DialogServers::on_tableView_doubleClicked(const QModelIndex &index)
 {
-
+    Q_UNUSED(index);
 }
 
 void DialogServers::on_btnSelect_clicked()
