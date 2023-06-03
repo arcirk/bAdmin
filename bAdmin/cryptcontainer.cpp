@@ -166,19 +166,6 @@ bool CryptContainer::to_file(const std::string &file)
     Q_ASSERT(is_valid);
     try {
         auto cnt = arcirk::cryptography::cont_info();
-//        cnt.header_key = ByteArray(_header_key.size());
-//        cnt.masks2_key = ByteArray(_masks2_key.size());
-//        cnt.masks_key = ByteArray(_masks_key.size());
-//        cnt.name_key = ByteArray(_name_key.size());
-//        cnt.primary2_key = ByteArray(_primary2_key.size());
-//        cnt.primary_key = ByteArray(_primary_key.size());
-//        std::copy(_header_key.begin(), _header_key.end(), cnt.header_key.begin());
-//        std::copy(_masks2_key.begin(), _masks2_key.end(), cnt.masks2_key.begin());
-//        std::copy(_masks_key.begin(), _masks_key.end(), cnt.masks_key.begin());
-//        std::copy(_name_key.begin(), _name_key.end(), cnt.name_key.begin());
-//        std::copy(_primary2_key.begin(), _primary2_key.end(), cnt.primary2_key.begin());
-//        std::copy(_primary_key.begin(), _primary_key.end(), cnt.primary_key.begin());
-
         header_key(cnt.header_key);
         masks2_key(cnt.masks2_key);
         masks_key(cnt.masks_key);
@@ -188,36 +175,6 @@ bool CryptContainer::to_file(const std::string &file)
 
         auto ba = arcirk::string_to_byte_array(pre::json::to_json(cnt).dump());
         arcirk::write_file(file, ba);
-//        std::vector<ByteArray> cnt(6);
-//        header_key(cnt[0]);
-//        masks2_key(cnt[1]);
-//        masks_key(cnt[2]);
-//        name_key(cnt[3]);
-//        primary2_key(cnt[4]);
-//        primary_key(cnt[5]);
-
-//        for(int i = 0; i < KeyFiles.size(); ++i){
-//            QString key = KeyFiles[i];
-//            auto funcGet = get_get_function(i);
-//            ByteArray data;
-//            funcGet(data);
-//            Q_ASSERT(data.size() != 0);
-//            arcirk::write_file(QDir::toNativeSeparators(d.path() + QDir::separator() + key).toStdString(),
-//                      data);
-//        }
-
-//        cnt.header_key = std::copy(_header_key.begin(), _header_key.end());
-//        cnt.masks2_key = _masks2_key;
-//        cnt.masks_key = _masks_key;
-//        cnt.name_key = _name_key;
-//        cnt.primary2_key = _primary2_key;
-//        cnt.primary_key = _primary_key;
-//        auto s = pre::json::to_json(cnt);
-//        auto ba = s.get_binary();
-
-//        std::ofstream f(file, std::ios::binary | std::ios::out);
-//        f.write((char*)&cnt, sizeof(cnt));
-//        f.close();
 
     } catch (const std::exception& e) {
         qCritical() << e.what();
@@ -235,15 +192,6 @@ void CryptContainer::from_file(const std::string &file)
     arcirk::read_file(file, ba);
     auto str = arcirk::byte_array_to_string(ba);
     auto cnt = pre::json::from_json<arcirk::cryptography::cont_info>(nlohmann::json::parse(str));
-
-    //cnt_data_ = std::make_shared<arcirk::cryptography::cont_info>();
-//    auto cnt = arcirk::cryptography::cont_info();
-//    //std::vector<ByteArray> cnt(6);
-//    std::ifstream f(file, std::ios::binary | std::ios::in);
-//    f.read((char*)&cnt, sizeof(arcirk::cryptography::cont_info));
-//    //f.read((char*)&cnt, sizeof(cnt));
-//    f.close();
-
     set_header_key(cnt.header_key);
     set_masks2_key(cnt.masks2_key);
     set_masks_key(cnt.masks_key);

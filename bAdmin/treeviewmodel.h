@@ -39,6 +39,7 @@ public:
     void set_column_aliases(const QMap<QString, QString> values);
     int get_column_index(const QString& name);
     QString get_column_name(int column) const;
+    void columns_establish_order(const QVector<QString>& names);
     void set_columns(const QVector<QString> cols);
     void set_server_object(arcirk::server::server_objects obj);
     arcirk::server::server_objects server_object() const;
@@ -61,6 +62,8 @@ public:
     void set_object(const QModelIndex &index, const nlohmann::json& object);
 
     void use_hierarchy(const std::string& column);
+
+    static QModelIndex find_in_table(QAbstractItemModel * model, const QString& value, int column, int role = Qt::DisplayRole, bool findData = false);
 
 private:
     arcirk::server::server_objects server_object_;

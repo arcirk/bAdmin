@@ -32,6 +32,8 @@
 typedef unsigned char BYTE;
 typedef std::vector<BYTE> ByteArray;
 
+#define NIL_STRING_UUID "00000000-0000-0000-0000-000000000000"
+
 namespace arcirk{
     template<typename T>
     static inline std::string enum_synonym(T value){
@@ -164,7 +166,23 @@ BOOST_FUSION_DEFINE_STRUCT(
         (std::string, system_user)
         (std::string, device_id)
         (std::string, info_base)
+        (std::string, product)
         (int, version)
+)
+
+BOOST_FUSION_DEFINE_STRUCT(
+        (arcirk::client), session_info,
+        (std::string, session_uuid)
+        (std::string, user_name)
+        (std::string, user_uuid)
+        (std::string, start_date)
+        (std::string, app_name)
+        (std::string, role)
+        (std::string, device_id)
+        (std::string, address)
+        (std::string, info_base)
+        (std::string, host_name)
+        (std::string, product)
 )
 
 BOOST_FUSION_DEFINE_STRUCT(
@@ -952,6 +970,7 @@ BOOST_FUSION_DEFINE_STRUCT(
     (ByteArray, data)
     (std::string, sha1)
     (std::string, suffix)
+    (std::string, cache)
 )
 
 BOOST_FUSION_DEFINE_STRUCT(

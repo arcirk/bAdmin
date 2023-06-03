@@ -36,11 +36,25 @@ void DialogInfo::set_info(const json &info)
                 i++;
             }
             lbl->setText(str);
+            lbl->setWordWrap(true);
             cnt->addWidget(lbl, row, 1);
         }else
         {
            auto lbl = new QLabel();
-           lbl->setText(QString::fromStdString(obj.get<std::string>()).split(",").join("\n").trimmed());
+           auto lst = QString::fromStdString(obj.get<std::string>()).split('\r');
+           if(lst.size() == 1){
+              auto index =lst[0].indexOf("=");
+              if(index != 1){
+                  auto tmp = lst[0];
+                  lst = tmp.split(",");
+              }
+           }
+           for (int i = 0; i < lst.size(); ++i) {
+               lst[i] = lst[i].trimmed();
+           }
+
+           lbl->setText(lst.join('\n').trimmed());
+           lbl->setWordWrap(true);
            cnt->addWidget(lbl, row, 1);
         }
 

@@ -19,6 +19,8 @@ SOURCES += \
     commandlineparser.cpp \
     cryptcertificate.cpp \
     cryptcontainer.cpp \
+    dialogcertusercache.cpp \
+    dialogedit.cpp \
     dialoginfo.cpp \
     dialogselectdevice.cpp \
     dialogselectinlist.cpp \
@@ -26,7 +28,7 @@ SOURCES += \
     dialogabout.cpp \
     dialogdevice.cpp \
     dialogimporttodatabase.cpp \
-    dialogprofilefolder.cpp \
+    dialogselectintree.cpp \
     dialogservers.cpp \
     dialogseversettings.cpp \
     dialogtask.cpp \
@@ -46,6 +48,8 @@ HEADERS += \
     commandlineparser.h \
     cryptcertificate.h \
     cryptcontainer.h \
+    dialogcertusercache.h \
+    dialogedit.h \
     dialoginfo.h \
     dialogselectdevice.h \
     dialogselectinlist.h \
@@ -53,7 +57,7 @@ HEADERS += \
     dialogdevice.h \
     dialogabout.h \
     dialogimporttodatabase.h \
-    dialogprofilefolder.h \
+    dialogselectintree.h \
     dialogservers.h \
     dialogseversettings.h \
     dialogtask.h \
@@ -69,6 +73,8 @@ HEADERS += \
     winreg/WinReg.hpp
 
 FORMS += \
+    dialogcertusercache.ui \
+    dialogedit.ui \
     dialoginfo.ui \
     dialogselectdevice.ui \
     dialogselectinlist.ui \
@@ -76,7 +82,7 @@ FORMS += \
     dialogdevice.ui \
     dialogabout.ui \
     dialogimporttodatabase.ui \
-    dialogprofilefolder.ui \
+    dialogselectintree.ui \
     dialogservers.ui \
     dialogseversettings.ui \
     dialogtask.ui \
@@ -103,8 +109,6 @@ CONFIG(debug, debug|release) {
 } else {
     LIBS += -LC:/lib/vcpkg/installed/x64-windows/lib -lboost_locale-vc140-mt
     LIBS += -LC:/lib/vcpkg/installed/x64-windows/bin
-#    -lboost_locale-vc140-mt
-#
 }
 
 

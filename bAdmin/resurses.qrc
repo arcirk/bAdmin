@@ -144,5 +144,8 @@
         <file>img/move_end.png</file>
         <file>img/startTask.png</file>
         <file>img/save.png</file>
+        <file>img/add_24.png</file>
+        <file>img/addGroup.png</file>
+        <file>img/addGroup_24.png</file>
     </qresource>
 </RCC>

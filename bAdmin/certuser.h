@@ -21,7 +21,7 @@ public:
 
     win_user_info getInfo() const;
 
-    nlohmann::json getCertificates();
+    nlohmann::json getCertificates(bool brief);
 
     nlohmann::json getContainers();
 
@@ -36,7 +36,7 @@ private:
 
     void get_sid();
 
-    nlohmann::json get_local_certificates();
+    nlohmann::json get_local_certificates(bool brief);
     nlohmann::json get_local_containers();
 
 signals:

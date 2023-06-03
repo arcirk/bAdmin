@@ -140,6 +140,10 @@ void WebSocketClient::read_conf()
     if(!dir.exists())
         dir.mkpath(path);
 
+#ifndef Q_OS_ANDROID
+    conf_.device_id = QSysInfo::machineUniqueId().toStdString();
+#endif
+
     auto fileName= path + "/" + CONF_FILENAME;
     if(QFile::exists(fileName)){
 
@@ -151,10 +155,14 @@ void WebSocketClient::read_conf()
 
         try {
             conf_ = pre::json::from_json<client::client_conf>(m_text);
+#ifndef Q_OS_ANDROID
+            if(conf_.device_id.empty())
+                conf_.device_id = QSysInfo::machineUniqueId().toStdString();
+#endif
         } catch (std::exception& e) {
             qCritical() << __FUNCTION__ << e.what();
         }
-    }else{
+    }else{        
         write_conf();
     }
 }
@@ -467,6 +475,7 @@ void WebSocketClient::onConnected()
     param.user_name = conf_.user_name;
     param.hash = conf_.hash;
     param.device_id = conf_.device_id;
+    param.product = QSysInfo::prettyProductName().toStdString();
 
     std::string p = pre::json::to_json(param).dump();
     QByteArray ba(p.c_str());
@@ -509,3 +518,35 @@ void WebSocketClient::onReconnect()
 
 }
 
+void WebSocketClient::register_device(const arcirk::client::session_info& sess_info)
+{
+//    qDebug() << QDateTime::currentDateTime().toString("hh:mm:ss") << __FUNCTION__;
+
+//        QUuid devId = QUuid::fromString(cli_conf.device_id.c_str());
+//        if(devId.isNull()){
+//            qCritical() << QDateTime::currentDateTime().toString("hh:mm:ss") << __FUNCTION__ << "Не верный идентификатор устройства!";
+//            return;
+//        }
+
+//        QString product = cli_conf->;
+
+//        auto record = arcirk::database::devices();
+//        record.ref = devId.toString(QUuid::StringFormat::WithoutBraces).toStdString();
+//        record.deviceType = arcirk::enum_synonym(arcirk::database::devices_type::devTablet);
+//        record.first = product.toStdString();
+//        record.second = product.toStdString();
+
+//        auto j = pre::json::to_json<arcirk::database::devices>(record);
+
+//        nlohmann::json struct_query_param = {
+//            {"table_name", arcirk::enum_synonym(arcirk::database::tables::tbDevices)},
+//            {"query_type", "update_or_insert"},
+//            {"values", j}
+//        };
+
+//        std::string query_param = QByteArray::fromStdString(struct_query_param.dump()).toBase64().toStdString();
+
+//        send_command(arcirk::server::server_commands::ExecuteSqlQuery, {
+//                         {"query_param", query_param}
+//                     });
+}

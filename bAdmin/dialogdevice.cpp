@@ -59,7 +59,7 @@ DialogDevice::DialogDevice(const nlohmann::json& deviceDetails, QWidget *parent)
     ui->edtFirst->setText( result_.first.c_str());
     ui->edtSecond->setText( result_.second.c_str());
     ui->edtRef->setText( result_.ref.c_str());
-
+    ui->txtAddress->setText(result_.address.c_str());
 }
 
 DialogDevice::~DialogDevice()
@@ -77,6 +77,7 @@ void DialogDevice::accept()
     result_.workplace= tables_v[tables::tbWorkplaces][ui->cmbWorkplaces->currentText().toStdString()];
     result_.first = ui->edtFirst->text().toStdString();
     result_.second = ui->edtSecond->text().toStdString();
+    result_.second = ui->txtAddress->text().toStdString();
 
     view_result_.ref = result_.ref;
     view_result_.first = result_.first;

@@ -67,6 +67,10 @@ private slots:
 
     void on_btnInfo_clicked();
 
+    void on_btnAddGroup_clicked();
+
+    void on_btnRegistryDevice_clicked();
+
 private:
     Ui::MainWindow *                         ui;
     WebSocketClient *                        m_client;
@@ -107,6 +111,10 @@ private:
     void update_icons(arcirk::server::server_objects key, TreeViewModel* model);
 
     void insert_container(CryptContainer& cnt);
+
+    void update_columns();
+
+    void edit_cert_user(const QModelIndex &index);
 
 signals:
     void setConnectionChanged(bool state);

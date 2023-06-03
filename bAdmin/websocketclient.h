@@ -53,6 +53,8 @@ public:
         return ver;
     }
 
+    void register_device(const arcirk::client::session_info& sess_info);
+
 private:
     client::client_conf conf_;
     server::server_config server_conf_;

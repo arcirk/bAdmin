@@ -59,10 +59,10 @@ nlohmann::json CertUser::getContainers()
         return {};
 }
 
-nlohmann::json CertUser::getCertificates()
+nlohmann::json CertUser::getCertificates(bool brief)
 {
     if(is_localhost_)
-        return get_local_certificates();
+        return get_local_certificates(brief);
     else
         return {};
 }
@@ -143,7 +143,7 @@ void CertUser::get_sid()
 
 }
 
-nlohmann::json CertUser::get_local_certificates()
+nlohmann::json CertUser::get_local_certificates(bool brief)
 {
 
     using json = nlohmann::json;
@@ -160,7 +160,6 @@ nlohmann::json CertUser::get_local_certificates()
     auto started = [&cmd, &cryptoProLocation]() -> void
     {
         cmd.send(QString("certmgr -list -store uMy & exit").arg(cryptoProLocation), CmdCommand::csptestGetCertificates);
-        //cmd.send(QString("cd \"%1\"").arg(QDir::toNativeSeparators(cryptoProLocation)), CmdCommand::cmdCD);
     };
     loop.connect(&cmd, &CommandLine::started_process, started);
 
@@ -191,19 +190,22 @@ nlohmann::json CertUser::get_local_certificates()
 
     std::string result_ = arcirk::to_utf(cmd_text.toStdString(), "cp866");
 
-    //qDebug() << qPrintable(result_.data());
 
     auto info = CommandLineParser::parse(result_.c_str(), CmdCommand::csptestGetCertificates);
 
     auto table = json::object();
     auto tmp = arcirk::database::table_default_json(arcirk::database::tables::tbCertificates);
     auto items = tmp.items();
-    auto columns = json::array();
+    auto columns = json::array({"first", "second", "private_key", "not_valid_before", "not_valid_after", "sha1", "suffix", "parent_user", "cache"});
     auto rows = json::array();
 
-    for (auto itr = items.begin(); itr != items.end(); ++itr) {
-        columns += itr.key();
+    if(!brief){
+        columns.clear();
+        for (auto itr = items.begin(); itr != items.end(); ++itr) {
+            columns += itr.key();
+        }
     }
+
 
     if(info.is_array()){
         if(info.size() > 0){
@@ -211,13 +213,23 @@ nlohmann::json CertUser::get_local_certificates()
                 auto obj = *itr;
                 auto cert_data = arcirk::database::table_default_struct<arcirk::database::certificates>(arcirk::database::tables::tbCertificates);
                 CryptCertificate::load_response(cert_data, obj);
-                rows += pre::json::to_json(cert_data);
+                if(brief){
+                    auto row = json::object();
+                    auto tmp_ = pre::json::to_json(cert_data);
+                    for (auto it = columns.begin(); it != columns.end(); ++it) {
+                        if(tmp_.find(*it) != tmp_.end()){
+                            row[*it] = tmp_[*it];
+                        }
+                    }
+                    rows += row;
+                }else
+                   rows += pre::json::to_json(cert_data);
+
+
             }
         }
         table["columns"] = columns;
         table["rows"] = rows;
-
-
     }
 
     return table;

@@ -31,6 +31,9 @@ public:
 
     static void load_response(arcirk::database::certificates& result, const nlohmann::json& object);
 
+    static bool save_as(const QString& sha1, const QString& file, QObject *parent);
+    static QString get_crypto_pro_dir();
+
 private:
     arcirk::database::certificates cert_struct;
     bool is_valid;

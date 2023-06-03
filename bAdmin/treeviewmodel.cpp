@@ -593,18 +593,29 @@ void TreeViewModel::set_object(const QModelIndex &index, const nlohmann::json &o
     Q_ASSERT(nodeInfo != 0);
     nodeInfo->rowData = object;
     emit dataChanged(index, index.sibling(index.row(), columns.size()));
-
-//    if(row < 0 || parentInfo->children.size() - 1 < row)
-//        return;
-    //NodeInfo nodeInfo(object, parentInfo);
-    //beginResetModel();
-//    nodeInfo->rowData = object;// std::move(nodeInfo);
-    //endResetModel();
 }
 
 void TreeViewModel::use_hierarchy(const std::string &column)
 {
     use_hierarchy_ = column;
+}
+
+QModelIndex TreeViewModel::find_in_table(QAbstractItemModel *model, const QString &value, int column, int role, bool findData)
+{
+    int rows =  model->rowCount();
+    for (int i = 0; i < rows; ++i) {
+        auto index = model->index(i, column);
+        if(findData){
+            if(value == index.data(role).toString())
+                return index;
+        }else{
+            QString data = index.data().toString();
+            if(value == data)
+                return index;
+        }
+    }
+
+    return QModelIndex();
 }
 
 void TreeViewModel::set_current_parent_path(const QString &value)
@@ -763,6 +774,21 @@ QString TreeViewModel::get_column_name(int column) const
         return columns[column];
 
     return {};
+}
+
+void TreeViewModel::columns_establish_order(const QVector<QString> &names)
+{
+    QVector<QString> result;
+    std::copy(names.begin(), names.end(), std::back_inserter(result));
+
+    for (auto itr = columns.constBegin(); itr != columns.constEnd(); ++itr) {
+        if(result.indexOf(*itr) == -1){
+            result.push_back(*itr);
+        }
+    }
+
+    columns.clear();
+    std::copy(result.begin(), result.end(), std::back_inserter(columns));
 }
 
 void TreeViewModel::set_columns(const QVector<QString> cols)

@@ -61,17 +61,14 @@ bool CryptCertificate::fromFile(const QString &path)
     QString suffix = inf.completeSuffix();
 
     auto cmd = CommandLine(this);
+    QString cryptoPrp = cryptoProDirectory.path();
+    cmd.setWorkingDirectory(cryptoPrp);
 
     QEventLoop loop;
 
-    QString cryptoPrp = cryptoProDirectory.path();
-
-    auto codec = QTextCodec::codecForName("CP1251");
-    QTextCodec::setCodecForLocale(codec);
-
-    auto started = [&cmd, &path, &cryptoPrp]() -> void
+    auto started = [&cmd, &path]() -> void
     {
-        QString s = QString("cd %1 & certutil \"%2\" & exit").arg(cryptoPrp, path);
+        QString s = QString("certutil \"%1\" & exit").arg(path);
         cmd.send(s, CmdCommand::certutilGetCertificateInfo);
     };
     loop.connect(&cmd, &CommandLine::started_process, started);
@@ -103,12 +100,11 @@ bool CryptCertificate::fromFile(const QString &path)
     cmd.start();
     loop.exec();
 
-    result = CommandLineParser::parse(codec->toUnicode(cmd_text), CmdCommand::certutilGetCertificateInfo);
+    std::string result_ = arcirk::to_utf(cmd_text.toStdString(), "cp866");
+    result = CommandLineParser::parse(result_.c_str(), CmdCommand::certutilGetCertificateInfo);
 
     if(result.empty() || !result.is_object())
         return false;
-
-
 
     auto st = pre::json::to_json(cert_info());
 
@@ -120,6 +116,7 @@ bool CryptCertificate::fromFile(const QString &path)
 
     cert_info_ = pre::json::from_json<cert_info>(st);
     cert_info_.suffix = suffix.toStdString();
+    cert_info_.cache = result.dump();
 
     try {
         arcirk::read_file(QTextCodec::codecForName("CP1251")->fromUnicode(path).toStdString(), cert_info_.data);
@@ -245,6 +242,93 @@ void CryptCertificate::load_response(arcirk::database::certificates& result, con
     result.not_valid_after = object.value("Not valid after", "");
     result.serial = object.value("Serial", "");
     result.sha1 = object.value("SHA1 Hash", "");
+    result.cache = object.dump();
+}
+
+bool CryptCertificate::save_as(const QString &sha1, const QString &file, QObject* parent)
+{
+    using json = nlohmann::json;
+
+    auto cmd = CommandLine(parent);
+    QString cryptoPro = get_crypto_pro_dir();
+    Q_ASSERT(!cryptoPro.isEmpty());
+    cmd.setWorkingDirectory(cryptoPro);
+
+    QEventLoop loop;
+
+    auto started = [&cmd, &file, &sha1]() -> void
+    {
+        QString command = QString("cryptcp -copycert -thumbprint \"%1\" -u -df \"%2\" & exit").arg(sha1, file);
+        cmd.send(command, CmdCommand::certmgrExportlCert);
+    };
+    loop.connect(&cmd, &CommandLine::started_process, started);
+
+    //json result{};
+    QByteArray cmd_text;
+    auto output = [&cmd_text](const QByteArray& data) -> void
+    {
+        cmd_text.append(data);
+    };
+    loop.connect(&cmd, &CommandLine::output, output);
+    auto err = [&loop, &cmd](const QString& data, int command) -> void
+    {
+        qDebug() << __FUNCTION__ << data << command;
+        cmd.stop();
+        loop.quit();
+    };
+    loop.connect(&cmd, &CommandLine::error, err);
+
+    auto state = [&loop]() -> void
+    {
+        loop.quit();
+    };
+    loop.connect(&cmd, &CommandLine::complete, state);
+
+    cmd.start();
+    loop.exec();
+
+   std::string result_ = arcirk::to_utf(cmd_text.toStdString(), "cp866");
+
+   qDebug() << qPrintable(result_.c_str());
+
+   //auto info__ = CommandLineParser::parse(result_.c_str(), certmgrExportlCert);
+
+   //auto result = parse(info__.get<std::string>().c_str());
+
+   return true;
+}
+
+QString CryptCertificate::get_crypto_pro_dir()
+{
+    bool is_found = false;
+    QString programFilesPath(QDir::fromNativeSeparators(getenv("PROGRAMFILES")));
+    QString programFilesPath_x86 = programFilesPath;
+    programFilesPath_x86.append(" (x86)");
+
+    QDir x64(programFilesPath + "/Crypto Pro/CSP");
+    QDir x86(programFilesPath_x86 + "/Crypto Pro/CSP");
+
+    QDir result;
+
+    if(x86.exists()){
+        QFile cryptcp(x86.path() + "/cryptcp.exe");
+        if(cryptcp.exists()){
+            is_found = true;
+            result = x86;
+        }
+    }else
+        if(x64.exists()){
+            QFile cryptcp(x86.path() + "/cryptcp.exe");
+            if(cryptcp.exists())
+                is_found = true;
+            result = x64;
+        }
+
+
+    if(!is_found)
+       return "";
+    else
+        return result.path();
 }
 
 nlohmann::json CryptCertificate::parse_details(const std::string &details) const

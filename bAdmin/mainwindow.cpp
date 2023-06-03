@@ -1,13 +1,11 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QStandardPaths>
-//#include "tabledelegate.h"
 #include <QMessageBox>
 #include "query_builder.hpp"
 #include "dialoguser.h"
 #include "connectiondialog.h"
 #include <QVector>
-#include <dialogprofilefolder.h>
 #include <QFileDialog>
 #include "dialogabout.h"
 #include "dialogseversettings.h"
@@ -24,6 +22,8 @@
 #include <QDirIterator>
 #include <QTemporaryFile>
 #include "dialoginfo.h"
+#include "dialogedit.h"
+#include "dialogcertusercache.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -53,12 +53,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     setWindowTitle(QString("Менеджер сервера (%1)").arg(current_user->getInfo().user.c_str()));
 
-//    auto cert = CryptCertificate(this);
-//    auto error = [](QString, QString) -> void{
-
-//    };
-
-//    connect(&cert, &CryptCertificate::error, error);
 }
 
 MainWindow::~MainWindow()
@@ -193,8 +187,8 @@ void MainWindow::serverResponse(const arcirk::server::server_response &message)
                 tableResetModel(arcirk::server::Devices, message.result.data());
             }else if(table_name == "Certificates"){
                 tableResetModel(arcirk::server::Certificates, message.result.data());
-            }else if(table_name == "CertUsers"){
-                tableResetModel(arcirk::server::CertUsers, message.result.data());
+//            }else if(table_name == "CertUsers"){
+//                tableResetModel(arcirk::server::CertUsers, message.result.data());
             }else if(table_name == "Containers"){
                 tableResetModel(arcirk::server::Containers, message.result.data());
             }
@@ -308,6 +302,8 @@ void MainWindow::tableResetModel(server::server_objects key, const QByteArray& r
             auto json = QByteArray::fromBase64(resp);
             //qDebug() << qPrintable(json);
             m_models[OnlineUsers]->set_table(nlohmann::json::parse(json));
+            QVector<QString> col_order{"app_name", "host_name", "address", "user_name", "role", "start_date", "session_uuid", "user_uuid", "device_id"};
+            m_models[OnlineUsers]->columns_establish_order(col_order);
             update_icons(OnlineUsers, m_models[OnlineUsers]);
             m_models[OnlineUsers]->reset();
         }
@@ -350,6 +346,13 @@ void MainWindow::tableResetModel(server::server_objects key, const QByteArray& r
         m_models[Services]->set_table(nlohmann::json::parse(tbls));
         update_icons(Services, m_models[Services]);
         m_models[Services]->reset();
+//    }else if (key == CertUsers){
+//        auto tbls = QByteArray::fromBase64(resp);
+//        m_models[CertUsers]->set_table(nlohmann::json::parse(tbls));
+//        //update_icons(Services, m_models[Services]);
+//        //m_models[CertUsers]->set_columns({"first","second","ref","parent", "is_group", "deletion_mark"});
+//        m_models[CertUsers]->use_hierarchy("first");
+//        m_models[CertUsers]->reset();
     }else{
         auto tbls = QByteArray::fromBase64(resp);
         m_models[key]->set_table(nlohmann::json::parse(tbls));
@@ -364,14 +367,17 @@ void MainWindow::resetModel(server::server_objects key, const nlohmann::json &da
         return;
 
     using namespace arcirk::server;
+    m_models[key]->set_table(data);
+    m_models[key]->reset();
+    update_icons(key, m_models[key]);
 
-//    if (key == LocalhostUserCertificates){
-        m_models[key]->set_table(data);
-        m_models[key]->reset();
-//    }else if (key == arcirk::server::LocalhostUserContainersRegistry){
+    if (key == LocalhostUserCertificates){
+
+    }else if (key == arcirk::server::LocalhostUserContainersRegistry){
+//        m_models[key]->set_rows_icon(QIcon("qrc:/img/cert16NoKey.png"));
 //        m_models[key]->set_table(data);
 //        m_models[key]->reset();
-//    }
+    }
 
         ui->treeView->resizeColumnToContents(0);
 }
@@ -388,13 +394,8 @@ void MainWindow::fillDefaultTree()
     tree->addTopLevelItem(root);
     auto item = addTreeNode("Активные пользователи", arcirk::enum_synonym(server::server_objects::OnlineUsers).c_str(), ":/img/activeUesers16.png");
     root->addChild(item);
-//    auto curr_user = addTreeNode("Текущий пользователь", СurrentUser, ":/img/userOptions.ico");
-//    root->addChild(curr_user);
-
-
-//    tree->expandAll();
-//    auto wsUsers = addTreeNode("Пользователи", UsersCatalogRoot, ":/img/users1.png");
-//    ws->addChild(wsUsers);
+    item = addTreeNode("Зарегистрированные пользователи", arcirk::enum_synonym(server::server_objects::CertUsers).c_str(), ":/img/certUsers.png");
+    root->addChild(item);
     item = addTreeNode("Службы", arcirk::enum_synonym(server::server_objects::Services).c_str(), ":/img/services.png");
     root->addChild(item);
     item = addTreeNode("База данных", arcirk::enum_synonym(server::server_objects::Database).c_str(), ":/img/sqlServer.png");
@@ -412,8 +413,6 @@ void MainWindow::fillDefaultTree()
     item = addTreeNode("Контейнеры", arcirk::enum_synonym(server::server_objects::Containers).c_str(), ":/img/cont.png");
     tbl->addChild(item);
     item = addTreeNode("Сертификаты", arcirk::enum_synonym(server::server_objects::Certificates).c_str(), ":/img/certs16.png");
-    tbl->addChild(item);
-    item = addTreeNode("Пользователи", arcirk::enum_synonym(server::server_objects::CertUsers).c_str(), ":/img/certUsers.png");
     tbl->addChild(item);
     item = addTreeNode("Текущий пользователь", arcirk::enum_synonym(server::server_objects::LocalhostUser).c_str(), ":/img/userOptions.ico");
     tbl->addChild(item);
@@ -477,6 +476,9 @@ void MainWindow::createModels()
             model->use_hierarchy("first");
         }else if(itr == DatabaseTables){
             model->set_rows_icon(QIcon(":/img/externalDataTable.png"));
+        }else if(itr == CertUsers){
+            //model->set_columns({"first","second","ref","parent", "is_group", "deletion_mark"});
+            model->use_hierarchy("first");
         }
         m_models.insert(itr, model);
     }
@@ -547,6 +549,7 @@ void MainWindow::createColumnAliases()
     m_colAliases.insert("parent_user", "Владелец");
     m_colAliases.insert("not_valid_before", "Начало действия");
     m_colAliases.insert("not_valid_after", "Окончание дейтствия");
+    m_colAliases.insert("type", "Тип");
 }
 
 void MainWindow::on_treeWidget_itemClicked(QTreeWidgetItem *item, int column)
@@ -593,7 +596,6 @@ void MainWindow::on_treeWidget_itemClicked(QTreeWidgetItem *item, int column)
                 if(index != -1)
                     ui->treeView->hideColumn(index);
             }
-//            ui->treeView->hideColumn(m_models[DatabaseUsers]->columnCount(QModelIndex()) - 1);
         }
         ui->treeView->resizeColumnToContents(0);
 
@@ -643,31 +645,35 @@ void MainWindow::on_treeWidget_itemClicked(QTreeWidgetItem *item, int column)
                                    });
         }
     }else if(key == QString(arcirk::enum_synonym(CertUsers).data())){
-        if(m_client->isConnected()){
-            auto query_param = nlohmann::json{
-                {"table_name", "CertUsers"},
-                {"where_values", nlohmann::json{}},
-                {"query_type", "select"},
-                {"empty_column", false},
-                {"line_number", false}
-            };
-            m_client->send_command(arcirk::server::server_commands::ExecuteSqlQuery, nlohmann::json{
-                                       {"query_param", QByteArray(query_param.dump().data()).toBase64().toStdString()}
-                                   });
+//        if(m_client->isConnected()){
+//            auto query_param = nlohmann::json{
+//                {"table_name", "CertUsers"},
+//                {"where_values", nlohmann::json{}},
+//                {"values", json::array({"first", "second", "ref", "cache", "uuid", "host", "parent", "is_group","deletion_mark"})},
+//                {"query_type", "select"}
+////                    ,
+////                {"empty_column", false},
+////                {"line_number", false}
+//            };
+//            m_client->send_command(arcirk::server::server_commands::ExecuteSqlQuery, nlohmann::json{
+//                                       {"query_param", QByteArray(query_param.dump().data()).toBase64().toStdString()}
+//                                   });
+//        }
+        if(m_models.find(CertUsers) != m_models.end()){
+            m_models[CertUsers]->fetchRoot("CertUsers");
+            QVector<QString> m_hide{"ref", "parent", "is_group", "deletion_mark", "cache", "sid", "uuid"};
+            foreach (auto const& itr, m_hide) {
+                auto index = m_models[CertUsers]->get_column_index(itr);
+                if(index != -1)
+                    ui->treeView->hideColumn(index);
+            }
         }
+        ui->treeView->resizeColumnToContents(0);
     }else if(key == QString(arcirk::enum_synonym(Containers).data())){
         if(m_client->isConnected()){
             auto values_ = pre::json::to_json(containers());
             values_.erase("data");
             auto values = arcirk::json_keys(values_);
-//            auto query_param = nlohmann::json{
-//                {"table_name", "Containers"},
-//                {"where_values", nlohmann::json{}},
-//                {"query_type", "select"},
-//                {"empty_column", false},
-//                {"line_number", false},
-//                {"values", values}
-//            };
             auto query_param = nlohmann::json{
                 {"table_name", arcirk::enum_synonym(Containers)},
                 {"where_values", nlohmann::json{}},
@@ -691,7 +697,7 @@ void MainWindow::on_treeWidget_itemClicked(QTreeWidgetItem *item, int column)
                                    });
         }
     }else if(key == QString(arcirk::enum_synonym(LocalhostUserCertificates).data())){
-        auto certs = current_user->getCertificates();
+        auto certs = current_user->getCertificates(true);
         if(certs.is_object() && !certs.empty()){
             resetModel(LocalhostUserCertificates, certs);
         }
@@ -702,6 +708,7 @@ void MainWindow::on_treeWidget_itemClicked(QTreeWidgetItem *item, int column)
         }
     }
 
+    update_columns();
 }
 
 void MainWindow::get_online_users() {
@@ -727,7 +734,7 @@ void MainWindow::get_online_users() {
 void MainWindow::update_icons(arcirk::server::server_objects key, TreeViewModel *model)
 {
     using namespace arcirk::server;
-    using namespace nlohmann;
+    using json = nlohmann::json;
 
     if(key == Devices){
         int ind = model->get_column_index("device_type");
@@ -782,6 +789,20 @@ void MainWindow::update_icons(arcirk::server::server_objects key, TreeViewModel 
             }else if(type_app == ExtendedLib){
                 model->set_icon(model->index(i,0,parent), app_icons[ExtendedLib].first);
             }
+        }
+    }else if(key == LocalhostUserCertificates){
+        model->set_rows_icon(QIcon(":/img/cert16NoKey.png"));
+    }else if(key == arcirk::server::LocalhostUserContainers){
+        using namespace arcirk::cryptography;
+        int ind = model->get_column_index("type");
+        auto parent = QModelIndex();
+        for (int i = 0; i < model->rowCount(parent); ++i) {
+            json vol = model->index(i, ind, parent).data(Qt::DisplayRole).toString().trimmed().toStdString();
+            auto volume = vol.get<TypeOfStorgare>();
+            if(volume == TypeOfStorgare::storgareTypeRegistry)
+                model->set_icon(model->index(i,0,parent), QIcon(":/img/registry16.png"));
+            else if(volume == TypeOfStorgare::storgareTypeLocalVolume)
+                model->set_icon(model->index(i,0,parent), QIcon(":/img/desktop.png"));
         }
     }
 }
@@ -859,6 +880,98 @@ void MainWindow::insert_container(CryptContainer &cnt)
     }
 }
 
+void MainWindow::update_columns()
+{
+    auto model = (TreeViewModel*)ui->treeView->model();
+    auto table = ui->treeView;
+
+    QList<QString> m_lst{"_id", "ref", "version", "is_group", "deletion_mark", "data", "cache", "parent"};
+
+    foreach (auto it, m_lst) {
+        auto ind = model->get_column_index(it);
+        if(ind != -1)
+            table->hideColumn(ind);
+    }
+}
+
+void MainWindow::edit_cert_user(const QModelIndex &index)
+{
+
+    if(!index.isValid()){
+        QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
+        return;
+    }
+
+    auto model = (TreeViewModel*)ui->treeView->model();
+    using namespace arcirk::database;
+    using json = nlohmann::json;
+    using namespace arcirk::server;
+
+
+    auto object = model->get_object(index);
+    auto query = builder::query_builder();
+
+    std::string query_text = query.select().from("CertUsers").where(nlohmann::json{
+                                                                       {"ref", object["ref"].get<std::string>()}
+                                                                   }, true).prepare();
+
+    auto param = nlohmann::json::object();
+    param["query_text"] = query_text;
+    auto command = arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery);
+    auto result = m_client->exec_http_query(command, param);
+
+    if(!result.is_object()){
+        QMessageBox::critical(this, "Ошибка", "Ошибка на свервере!");
+        return;
+    }
+
+    auto rows = result["rows"];
+    if(!rows.is_array()){
+        QMessageBox::critical(this, "Ошибка", "Ошибка на свервере!");
+        return;
+    }
+
+    if(rows.size() == 0){
+        QMessageBox::critical(this, "Ошибка", "Запись не найдена!");
+        return;
+    }
+
+    auto struct_users = pre::json::from_json<arcirk::database::cert_users>(rows[0]);
+    auto parent = index.parent();
+    QString parentName;
+    if(parent.isValid()){
+        parentName = parent.data().toString();
+    }
+
+    auto dlg = DialogEdit(object, parentName, this);
+    dlg.setModal(true);
+    dlg.exec();
+
+    if(dlg.result() == QDialog::Accepted){
+        struct_users.first = object["first"];
+        struct_users.second = object["second"];
+        nlohmann::json query_param = {
+            {"table_name", arcirk::enum_synonym(tables::tbCertUsers)},
+            {"query_type", "update"},
+            {"values", pre::json::to_json(struct_users)},
+            {"where_values", nlohmann::json({
+                 {"ref", struct_users.ref}
+             })}
+        };
+
+        std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+        auto resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::ExecuteSqlQuery), json{
+                                             {"query_param", base64_param}
+                                         });
+        if(resp.is_string()){
+            if(resp.get<std::string>() == "success"){
+                model->set_object(index ,pre::json::to_json(struct_users));
+                update_icons(server_objects::CertUsers, model);
+            }
+        }
+    }
+}
+
 
 QModelIndex MainWindow::findInTable(QAbstractItemModel * model, const QString &value, int column, bool findData)
 {
@@ -880,6 +993,17 @@ QModelIndex MainWindow::findInTable(QAbstractItemModel * model, const QString &v
 
 void MainWindow::on_btnEdit_clicked()
 {
+    auto index = ui->treeView->currentIndex();
+
+    if(!index.isValid()){
+        QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
+        return;
+    }
+
+    auto model = (TreeViewModel*)ui->treeView->model();
+    if(model->server_object() == arcirk::server::CertUsers){
+        edit_cert_user(index);
+    }
 
 }
 
@@ -896,121 +1020,161 @@ void MainWindow::on_treeView_doubleClicked(const QModelIndex &index)
     using json = nlohmann::json;
     using namespace arcirk::server;
 
-    if(model->server_object() == arcirk::server::DatabaseUsers){
-        auto object = model->get_object(index);
-        if(object["is_group"].get<int>() == 1){
-            //QMessageBox::critical(this, "Ошибка", "Редактирование групп запрещено!");
-            return;
-        }
-
-        auto query = builder::query_builder();
-
-        std::string query_text = query.select().from("Users").where(nlohmann::json{
-                                                                           {"ref", object["ref"].get<std::string>()}
-                                                                       }, true).prepare();
-
-        auto param = nlohmann::json::object();
-        param["query_text"] = query_text;
-        auto command = arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery);
-        auto result = m_client->exec_http_query(command, param);
-
-        if(!result.is_object()){
-            QMessageBox::critical(this, "Ошибка", "Ошибка на свервере!");
-            return;
-        }
-
-        auto rows = result["rows"];
-        if(!rows.is_array()){
-            QMessageBox::critical(this, "Ошибка", "Ошибка на свервере!");
-            return;
-        }
-
-        if(rows.size() == 0){
-            QMessageBox::critical(this, "Ошибка", "Запись не найдена!");
-            return;
-        }
-
-        auto struct_users = pre::json::from_json<arcirk::database::user_info>(rows[0]);
-        auto parent = index.parent();
-        QString parentName;
-        if(parent.isValid()){
-            parentName = parent.data().toString();
-        }
-        auto dlg = DialogUser(struct_users, parentName, this);
-        dlg.setModal(true);
-        dlg.exec();
-
-        if(dlg.result() == QDialog::Accepted){
-            nlohmann::json query_param = {
-                {"table_name", arcirk::enum_synonym(tables::tbUsers)},
-                {"query_type", "update"},
-                {"values", pre::json::to_json(struct_users)},
-                {"where_values", nlohmann::json({
-                     {"ref", struct_users.ref}
-                 })}
-            };
-
-            std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
-            auto resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::ExecuteSqlQuery), json{
-                                                 {"query_param", base64_param}
-                                             });
-            if(resp.is_string()){
-                if(resp.get<std::string>() == "success"){
-                    model->set_object(index ,pre::json::to_json(struct_users));
-                    update_icons(server_objects::Devices, model);
-                }
+    try {
+        if(model->server_object() == arcirk::server::DatabaseUsers){
+            auto object = model->get_object(index);
+            if(object["is_group"].get<int>() == 1){
+                //QMessageBox::critical(this, "Ошибка", "Редактирование групп запрещено!");
+                return;
             }
-        }
 
-    }else if(model->server_object() == arcirk::server::Devices){
+            auto query = builder::query_builder();
 
-        auto ref = model->data(model->index(index.row(), model->get_column_index("ref"), index.parent()), Qt::DisplayRole).toString();
-        json param{
-            {"device", ref.toStdString()}
-        };
-        //m_client->send_command(server_commands::DeviceGetFullInfo, param);
-        auto resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::DeviceGetFullInfo), param);
-        if(resp.is_object()){
-            auto dlg = DialogDevice(resp, this);
+            std::string query_text = query.select().from("Users").where(nlohmann::json{
+                                                                               {"ref", object["ref"].get<std::string>()}
+                                                                           }, true).prepare();
+
+            auto param = nlohmann::json::object();
+            param["query_text"] = query_text;
+            auto command = arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery);
+            auto result = m_client->exec_http_query(command, param);
+
+            if(!result.is_object()){
+                QMessageBox::critical(this, "Ошибка", "Ошибка на свервере!");
+                return;
+            }
+
+            auto rows = result["rows"];
+            if(!rows.is_array()){
+                QMessageBox::critical(this, "Ошибка", "Ошибка на свервере!");
+                return;
+            }
+
+            if(rows.size() == 0){
+                QMessageBox::critical(this, "Ошибка", "Запись не найдена!");
+                return;
+            }
+
+            auto struct_users = pre::json::from_json<arcirk::database::user_info>(rows[0]);
+            auto parent = index.parent();
+            QString parentName;
+            if(parent.isValid()){
+                parentName = parent.data().toString();
+            }
+            auto dlg = DialogUser(struct_users, parentName, this);
             dlg.setModal(true);
             dlg.exec();
 
             if(dlg.result() == QDialog::Accepted){
-                auto dev = dlg.get_result();
                 nlohmann::json query_param = {
-                    {"table_name", "Devices"},
+                    {"table_name", arcirk::enum_synonym(tables::tbUsers)},
                     {"query_type", "update"},
-                    {"values", pre::json::to_json(dev)},
+                    {"values", pre::json::to_json(struct_users)},
                     {"where_values", nlohmann::json({
-                         {"ref", ref.toStdString()}
+                         {"ref", struct_users.ref}
                      })}
                 };
 
                 std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
-                resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::ExecuteSqlQuery), json{
+                auto resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::ExecuteSqlQuery), json{
                                                      {"query_param", base64_param}
                                                  });
                 if(resp.is_string()){
                     if(resp.get<std::string>() == "success"){
-                        model->set_object(index ,pre::json::to_json(dlg.get_view_result()));
-                        update_icons(server_objects::Devices, model);
+                        model->set_object(index ,pre::json::to_json(struct_users));
+                        update_icons(server_objects::DatabaseUsers, model);
                     }
                 }
             }
+
+        }else if(model->server_object() == arcirk::server::Devices){
+
+            auto ref = model->data(model->index(index.row(), model->get_column_index("ref"), index.parent()), Qt::DisplayRole).toString();
+            json param{
+                {"device", ref.toStdString()}
+            };
+            //m_client->send_command(server_commands::DeviceGetFullInfo, param);
+            auto resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::DeviceGetFullInfo), param);
+            if(resp.is_object()){
+                auto dlg = DialogDevice(resp, this);
+                dlg.setModal(true);
+                dlg.exec();
+
+                if(dlg.result() == QDialog::Accepted){
+                    auto dev = dlg.get_result();
+                    nlohmann::json query_param = {
+                        {"table_name", "Devices"},
+                        {"query_type", "update"},
+                        {"values", pre::json::to_json(dev)},
+                        {"where_values", nlohmann::json({
+                             {"ref", ref.toStdString()}
+                         })}
+                    };
+
+                    std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+                    resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::ExecuteSqlQuery), json{
+                                                         {"query_param", base64_param}
+                                                     });
+                    if(resp.is_string()){
+                        if(resp.get<std::string>() == "success"){
+                            model->set_object(index ,pre::json::to_json(dlg.get_view_result()));
+                            update_icons(server_objects::Devices, model);
+                        }
+                    }
+                }
+            }
+        }else if(model->server_object() == arcirk::server::Services){
+            auto obj = pre::json::from_json<arcirk::services::task_options>(model->get_object(index));
+            auto dlg = DialogTask(obj, this);
+            dlg.setModal(true);
+            dlg.exec();
+            if(dlg.result() == QDialog::Accepted){
+                model->set_object(index, pre::json::to_json(obj));
+                auto arr_service = model->get_objects(index.parent());
+                json param{};
+                param["task_options"] = arr_service;
+                m_client->send_command(server_commands::UpdateTaskOptions, param);
+            }
+        }else if(model->server_object() == arcirk::server::CertUsers){
+            auto is_group = model->data(model->index(index.row(), model->get_column_index("is_group"), index.parent()), Qt::DisplayRole).toInt();
+            if(is_group == 1)
+                return;
+            auto obj = model->get_object(index);
+            auto struct_user = pre::json::from_json<arcirk::database::cert_users>(obj);
+            m_models[DatabaseUsers]->fetchRoot("Users");
+
+            auto types = json::array({enum_synonym(device_types::devDesktop), enum_synonym(device_types::devServer)});
+            json query_param = {
+                {"table_name", arcirk::enum_synonym(tables::tbDevices)},
+                {"query_type", "select"},
+                {"values", json{"first", "ref"}},
+                {"where_values", json{{"deviceType", types}}}
+            };
+            std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+            auto dev = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery), json{
+                                                 {"query_param", base64_param}
+                                             });
+            auto rows = dev.value("rows", json::array());
+            auto dlg = DialogCertUserCache(struct_user, m_models[server_objects::DatabaseUsers], rows, this);
+            dlg.setModal(true);
+            dlg.exec();
+            if(dlg.result() == QDialog::Accepted){
+                auto query_param = nlohmann::json{
+                    {"table_name", enum_synonym(tables::tbCertUsers)},
+                    {"where_values", nlohmann::json{{"ref", struct_user.ref}}},
+                    {"values", pre::json::to_json(struct_user)},
+                    {"query_type", "update"}
+                };
+
+                m_client->send_command(arcirk::server::server_commands::ExecuteSqlQuery, nlohmann::json{
+                                           {"query_param", QByteArray(query_param.dump().data()).toBase64().toStdString()}
+                                       });
+            }
         }
-    }else if(model->server_object() == arcirk::server::Services){
-        auto obj = pre::json::from_json<arcirk::services::task_options>(model->get_object(index));
-        auto dlg = DialogTask(obj, this);
-        dlg.setModal(true);
-        dlg.exec();
-        if(dlg.result() == QDialog::Accepted){
-            model->set_object(index, pre::json::to_json(obj));
-            auto arr_service = model->get_objects(index.parent());
-            json param{};
-            param["task_options"] = arr_service;
-            m_client->send_command(server_commands::UpdateTaskOptions, param);
-        }
+    } catch (const std::exception& e) {
+        qCritical() << __FUNCTION__ << e.what();
     }
+
 }
 
 
@@ -1030,25 +1194,6 @@ void MainWindow::on_btnDataImport_clicked()
         model_->set_column_aliases(m_colAliases);
         model_->set_server_object(arcirk::server::ProfileDirectory);
         model_->fetchRoot("ProfileDirectory", "shared_files/files");
-        auto dlg = DialogProfileFolder(model_, this);
-        dlg.setModal(true);
-        dlg.setWindowTitle("Выбор файла для импорта");
-        dlg.exec();
-
-        if(dlg.result() == QDialog::Accepted){
-            auto tableName = model->index(index.row(), model->get_column_index("name"), index.parent()).data().toString();
-            auto path = dlg.file_name();
-            if(QMessageBox::question(this, "Импорт файла", QString("Импортировать данные из файла в таблицу %1?").arg(tableName)) == QMessageBox::No)
-                return;
-            if(m_client->isConnected()){
-                auto param = nlohmann::json{
-                    {"file_name", path.toStdString()},
-                    {"table_name", tableName.toStdString()},
-                };
-                m_client->send_command(arcirk::server::server_commands::FileToDatabase, param);
-            }
-        }
-
         delete model_;
     }
 }
@@ -1123,7 +1268,7 @@ void MainWindow::on_btnAdd_clicked()
                         struct_certs.parent_user = cert.parent();
                         struct_certs.issuer = cert.issuer_briefly();
                         struct_certs.subject = cert.subject_briefly();
-                        struct_certs.cache = cert.dump();
+                        struct_certs.cache = cert.getData().cache;
                         struct_certs.sha1 = cert.sha1();
 
                         nlohmann::json query_param = {
@@ -1267,72 +1412,7 @@ void MainWindow::on_btnAdd_clicked()
                             if(org_name == dlgResult[0]){
                                 cnt.from_dir(dir);
                                 insert_container(cnt);
-//                                auto info = cnt.info(dlgResult[1] + org_name);
-//                                auto cnt_info_ = arcirk::database::containers();
-//                                //auto struct_certs = arcirk::database::certificates();
-//                                cnt_info_.cache = info.dump();
-//                                cnt_info_._id = 0;
-//                                cnt_info_.deletion_mark = 0;
-//                                cnt_info_.is_group = 0;
-//                                cnt_info_.first = org_name.toStdString();
-//                                cnt_info_.not_valid_after = info["Not valid after"];
-//                                cnt_info_.not_valid_before = info["Not valid before"];
-//                                cnt_info_.version = 0;
-//                                cnt_info_.ref = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
-//                                cnt_info_.parent = arcirk::uuids::nil_string_uuid();
-//                                cnt_info_.parent_user = info["ParentUser"];
-//                                cnt_info_.issuer = info["Issuer"];
-//                                cnt_info_.subject = info["Subject"];
-
-//                                nlohmann::json query_param = {
-//                                    {"table_name", arcirk::enum_synonym(tables::tbContainers)},
-//                                    {"query_type", "insert"},
-//                                    {"values", pre::json::to_json(cnt_info_)}
-//                                };
-//                                std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
-//                                auto resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::ExecuteSqlQuery), json{
-//                                                                     {"query_param", base64_param}
-//                                                                 });
-//                                if(resp  != "error"){
-//                                    //обновим данные
-//                                    query_param = {
-//                                        {"table_name", arcirk::enum_synonym(tables::tbContainers)},
-//                                        {"where_values", json{
-//                                             {"ref", cnt_info_.ref}
-//                                         }}
-//                                    };
-//                                    base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
-//                                    json param{
-//                                        {"destantion", base64_param},
-//                                        {"file_name", org_name.toStdString() + ".bin"}
-//                                    };
-//                                    auto ba = cnt.to_byate_array();
-//                                    resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::DownloadFile), param, ba);
-//                                    if(resp  != "error"){
-//                                        auto query_param = nlohmann::json{
-//                                            {"table_name", arcirk::enum_synonym(tables::tbContainers)},
-//                                            {"where_values", nlohmann::json{}},
-//                                            {"query_type", "select"},
-//                                            {"empty_column", false},
-//                                            {"line_number", false},
-//                                            {"values", json{
-//                                                    "first",
-//                                                    "ref",
-//                                                    "parent_user",
-//                                                    "subject",
-//                                                    "issuer",
-//                                                    "not_valid_before",
-//                                                    "not_valid_after"
-//                                                }
-//                                            }
-//                                        };
-//                                        m_client->send_command(arcirk::server::server_commands::ExecuteSqlQuery, nlohmann::json{
-//                                                                   {"query_param", QByteArray(query_param.dump().data()).toBase64().toStdString()}
-//                                                               });
-//                                    }
-//                                }
                             }
-//                            return;
                         }
                     }
                 }else if(m_type == TypeOfStorgare::storgareTypeRegistry){
@@ -1344,10 +1424,59 @@ void MainWindow::on_btnAdd_clicked()
                     insert_container(cnt);
                 }
 
-            }else {
             }
         }
 
+    }else if(model->server_object() == arcirk::server::CertUsers){
+        auto index = ui->treeView->currentIndex();
+        QModelIndex current_parent{};
+        auto user_struct = arcirk::database::table_default_struct<arcirk::database::cert_users>(arcirk::database::tbCertUsers);
+        if(index.isValid()){
+
+            auto parent_object = model->get_object(index);
+            current_parent = index;
+
+            if(parent_object["is_group"] == 0){
+                auto parent = index.parent();                
+                if(!parent.isValid())
+                {
+                    QMessageBox::critical(this, "Ошибка", "Выберете группу!");
+                    return;
+                }
+                parent_object = model->get_object(parent);
+                current_parent = parent;
+            }
+
+            std::string parent_name = parent_object["first"];
+
+            auto struct_users = arcirk::database::table_default_json(arcirk::database::tables::tbCertUsers);
+            struct_users["parent"] = parent_object["ref"];
+            struct_users["ref"] = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
+            struct_users["is_group"] = 0;
+            m_models[DatabaseUsers]->fetchRoot("Users");
+            auto dlg = DialogEdit(struct_users, parent_name.c_str(), m_models[arcirk::server::server_objects::DatabaseUsers], this);
+            dlg.setModal(true);
+            dlg.exec();
+            if(dlg.result() == QDialog::Accepted){
+                nlohmann::json query_param = {
+                    {"table_name", "CertUsers"},
+                    {"query_type", "insert"},
+                    {"values", struct_users},
+                    {"where_values", {}}
+                };
+
+                std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+                auto resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::ExecuteSqlQuery), json{
+                                                     {"query_param", base64_param}
+                                                 });
+                if(resp.is_string()){
+                    if(resp.get<std::string>() == "success"){
+                        model->add(struct_users, current_parent);
+                    }
+                }
+            }
+        }else
+            QMessageBox::critical(this, "Ошибка", "Выберете группу!");
     }
 }
 
@@ -1449,6 +1578,33 @@ void MainWindow::on_btnDelete_clicked()
 
             json query_param = {
                 {"query_text", QString("DELETE FROM Containers WHERE ref = '%1';").arg(ref).toStdString()}
+            };
+            std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+            auto resp = m_client->exec_http_query(command, query_param);
+            model->remove(index);
+
+        }
+    }else if(model->server_object() == server_objects::CertUsers){
+        int ind = model->get_column_index("first");
+        int indRef = model->get_column_index("ref");
+        int ind_is_group = model->get_column_index("is_group");
+        auto name = model->index(index.row(), ind, index.parent()).data().toString();
+        auto ref = model->index(index.row(), indRef, index.parent()).data().toString();
+        auto is_group = model->index(index.row(), ind_is_group, index.parent()).data().toInt();
+        auto result = QMessageBox::question(this, "Удаление пользователя или группы", QString("Удалить  %1").arg(name));
+
+        if(result == QMessageBox::Yes){
+            using namespace arcirk::database::builder;
+            auto command = arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery);
+
+            QString query_text;
+            if(is_group == 0)
+                query_text  = QString("DELETE FROM CertUsers WHERE ref = '%1';").arg(ref);
+            else
+                query_text  = QString("DELETE FROM CertUsers WHERE ref = '%1' or parent = '%2';").arg(ref).arg(ref);
+
+            json query_param = {
+                {"query_text", query_text.arg(ref).toStdString()}
             };
             std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
             auto resp = m_client->exec_http_query(command, query_param);
@@ -1703,6 +1859,17 @@ void MainWindow::on_btnSendClientRelease_clicked()
 
         }
 
+    }else if(model->server_object() == arcirk::server::LocalhostUserCertificates){
+        QString fileName = QFileDialog::getSaveFileName(this, tr("Сохранить как"),
+                                                     QDir::homePath(),
+                                                     "Файл сертификата (*.cer)");
+        if(fileName != ""){
+            int ind = model->get_column_index("sha1");
+            QString sha1 = model->index(index.row(), ind, index.parent()).data(Qt::DisplayRole).toString();
+            if(!sha1.isEmpty()){
+                CryptCertificate::save_as(sha1, fileName, this);
+            }
+        }
     }
 }
 
@@ -1734,7 +1901,9 @@ void MainWindow::on_btnInfo_clicked()
 
     using json = nlohmann::json;
 
-    if(model->server_object() == arcirk::server::Containers){
+    if(model->server_object() == arcirk::server::Containers
+            || model->server_object() == arcirk::server::Certificates
+            || model->server_object() == arcirk::server::LocalhostUserCertificates){
         auto ind = model->get_column_index("cache");
         auto ind_first = model->get_column_index("first");
         if(ind == -1 || ind_first == -1)
@@ -1748,6 +1917,122 @@ void MainWindow::on_btnInfo_clicked()
             dlg.setModal(true);
             dlg.exec();
         }
+
+    }
+}
+
+
+void MainWindow::on_btnAddGroup_clicked()
+{
+
+    auto model = (TreeViewModel*)ui->treeView->model();
+
+    auto index = ui->treeView->currentIndex();
+
+    if(model->server_object() == arcirk::server::CertUsers){
+        auto st = arcirk::database::table_default_json(arcirk::database::tables::tbCertUsers);
+        st["is_group"] = 1;
+
+        QString parent_name;
+        QString parent_uuid = NIL_STRING_UUID;
+        QModelIndex parent;
+        int is_group = 0;
+        if(index.isValid()){
+            parent = index.parent();
+            auto ind_is_group = model->get_column_index("is_group");
+            auto ind_first = model->get_column_index("first");
+            auto ind_ref = model->get_column_index("ref");
+            is_group = model->index(index.row(), ind_is_group, index.parent()).data(Qt::DisplayRole).toInt();
+            if(is_group == 1){
+                parent_name = model->index(index.row(), ind_first, index.parent()).data(Qt::DisplayRole).toString();
+                parent_uuid = model->index(index.row(), ind_ref, index.parent()).data(Qt::DisplayRole).toString();
+            }else{
+
+                if(parent.isValid()){
+                    parent_name = model->index(parent.row(), ind_first, parent.parent()).data(Qt::DisplayRole).toString();
+                    parent_uuid = model->index(parent.row(), ind_ref, parent.parent()).data(Qt::DisplayRole).toString();
+                }
+            }
+        }else
+            parent = QModelIndex();
+
+        st["parent"] = parent_uuid.toStdString();
+
+        auto dlg = DialogEdit(st, parent_name, this);
+        dlg.setModal(true);
+        dlg.exec();
+
+        if(dlg.result() == QDialog::Accepted){
+            nlohmann::json query_param = {
+                {"table_name", arcirk::enum_synonym(tables::tbCertUsers)},
+                {"query_type", "insert"},
+                {"values", st}
+            };
+            std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+            auto resp = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery), json{
+                                                 {"query_param", base64_param}
+                                             });
+            std::string result = "success";
+            if(resp.is_string())
+                result = resp.get<std::string>();
+            if(resp != "error"){
+                if(is_group == 0)
+                    model->add(st, index.parent());
+                else
+                    model->add(st, index);
+            }
+        }
+    }
+
+}
+
+
+void MainWindow::on_btnRegistryDevice_clicked()
+{
+    auto model = (TreeViewModel*)ui->treeView->model();
+    auto index = ui->treeView->currentIndex();
+    if(!index.isValid()){
+        QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
+        return;
+    }
+
+    using namespace arcirk::database;
+
+    if(model->server_object() == arcirk::server::OnlineUsers){
+
+        auto sess_info = pre::json::from_json<arcirk::client::session_info>(model->get_object(index));
+
+        if(sess_info.device_id == NIL_STRING_UUID){
+            QMessageBox::critical(this, "Ошибка", "Устройство имеет пустой идентификатор!");
+            return;
+        }
+
+        if(QMessageBox::question(this, "Регистрация устройства", QString("Зарегистрировать устройство %1").arg(sess_info.host_name.c_str())) == QMessageBox::No)
+            return;
+
+        auto dev = table_default_struct<devices>(tables::tbDevices);
+        dev.address = sess_info.address;
+        dev.deviceType = arcirk::enum_synonym(arcirk::server::device_types::devDesktop);
+        dev.first = sess_info.host_name;
+        dev.second = sess_info.product;
+        dev.ref = sess_info.device_id;
+
+        nlohmann::json query_param = {
+            {"table_name", arcirk::enum_synonym(tables::tbDevices)},
+            {"query_type", "insert"},
+            {"values", pre::json::to_json(dev)}
+        };
+        std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+        auto resp = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery), json{
+                                             {"query_param", base64_param}
+                                         });
+
+        std::string result = "success";
+        if(resp.is_string())
+            result = resp.get<std::string>();
+
+        if(result == "success")
+            QMessageBox::information(this, "Регистрация устройства", "Устройство успешно зарегистрировано!");
 
     }
 }
