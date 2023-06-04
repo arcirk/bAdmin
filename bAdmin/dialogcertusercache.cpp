@@ -7,7 +7,7 @@
 #include <QStringListModel>
 
 DialogCertUserCache::DialogCertUserCache(arcirk::database::cert_users& obj, TreeViewModel * users_model,
-                                         const nlohmann::json& hosts, QWidget *parent) :
+                                         const nlohmann::json& hosts, const QString& def_url, QWidget *parent) :
     QDialog(parent),
     ui(new Ui::DialogCertUserCache),
     object(obj)
@@ -27,12 +27,21 @@ DialogCertUserCache::DialogCertUserCache(arcirk::database::cert_users& obj, Tree
 
     if(!srv_conf.ServerHost.empty()){
         QString scheme = srv_conf.ServerSSL ? "wss" : "ws";
-        QString port = srv_conf.ServerPort > 0 ? ":" + QString::number(srv_conf.ServerPort) : "";
-        QUrl url(scheme + "://" + srv_conf.ServerHost.c_str() + port);
-        ui->txtServer->setText(url.path());
+        QUrl url{};
+        url.setHost(srv_conf.ServerHost.c_str());
+        url.setPort(srv_conf.ServerPort);
+        url.setScheme(scheme);
+        ui->txtServer->setText(url.toString());
+    }else{
+        QUrl url(def_url);
+        srv_conf.ServerSSL = url.scheme() == "wss" ? true : false;
+        srv_conf.ServerHost = url.host().toStdString();
+        srv_conf.ServerPort = url.port();
+        ui->txtServer->setText(url.toString());
     }
 
     ui->chkStandradPass->setCheckState(cache.value("standard_password", true) ? Qt::Checked : Qt::Unchecked);
+    ui->txtServerUser->setText(cli_param.user_name.c_str());
 
     users_model_ = users_model;
 
@@ -44,6 +53,9 @@ DialogCertUserCache::DialogCertUserCache(arcirk::database::cert_users& obj, Tree
 
     auto lst_ = new QStringListModel(lst, this);
     ui->cmbHost->setModel(lst_);
+
+    if(!cli_param.host_name.empty())
+        ui->cmbHost->setCurrentText(cli_param.host_name.c_str());
 
 }
 
@@ -62,6 +74,7 @@ void DialogCertUserCache::accept()
             cli_param.hash = WebSocketClient::generateHash(cli_param.user_name.c_str(), ui->lblPwd->text()).trimmed().toStdString();
         }
     }
+    cli_param.host_name = ui->cmbHost->currentText().toStdString();
     cache["client_param"] = pre::json::to_json(cli_param);
     cache["server_config"] = pre::json::to_json(srv_conf);
 

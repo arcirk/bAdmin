@@ -487,7 +487,7 @@ void TreeViewModel::fetchMore(const QModelIndex &parent)
         auto children = http_result["rows"];
 
         if(children.is_array()){
-            int insrtCnt = children.size() - 1;
+            int insrtCnt = (int)children.size() - 1;
             if (insrtCnt < 0) {
                 insrtCnt = 0;
             }
@@ -573,15 +573,38 @@ void TreeViewModel::remove(const QModelIndex &index)
 void TreeViewModel::add(const nlohmann::json object, const QModelIndex &parent)
 {
     NodeInfo* parentInfo = static_cast<NodeInfo*>(parent.internalPointer());
-    int insrtCnt = parentInfo->children.size() - 1;
-    if (insrtCnt < 0) {
-        insrtCnt = 0;
+    if(parentInfo == 0){
+        if(columns.size() == 0){
+            bool is_valid_hierarchy = false;
+            for (auto itr = object.items().begin(); itr != object.items().end(); ++itr) {
+                std::string name = itr.key();
+                if(!use_hierarchy_.empty() && use_hierarchy_ == name){
+                    is_valid_hierarchy = true;
+                    continue;
+                }
+                columns.push_back(QString::fromStdString(name));
+            }
+            if(is_valid_hierarchy){
+                columns.insert(0, QString::fromStdString(use_hierarchy_));
+            }
+        }
+
+        NodeInfo nodeInfo(object);
+        int is_group = object.value("is_group", 0);
+        nodeInfo.mapped = is_group != 1;// e["is_group"] != 1;
+        _nodes.push_back(std::move(nodeInfo));
+        reset();
+    }else{
+        int insrtCnt = parentInfo->children.size() - 1;
+        if (insrtCnt < 0) {
+            insrtCnt = 1;
+        }
+        beginInsertRows(parent, 0, insrtCnt);
+        NodeInfo nodeInfo(object, parentInfo);
+        nodeInfo.mapped = object["is_group"] != 1;
+        parentInfo->children.push_back(std::move(nodeInfo));
+        endInsertRows();
     }
-    beginInsertRows(parent, 0, insrtCnt);
-    NodeInfo nodeInfo(object, parentInfo);
-    nodeInfo.mapped = object["is_group"] != 1;
-    parentInfo->children.push_back(std::move(nodeInfo));
-    endInsertRows();
 }
 
 void TreeViewModel::set_object(const QModelIndex &index, const nlohmann::json &object)

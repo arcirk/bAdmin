@@ -17,8 +17,8 @@ CommandLine::CommandLine(QObject *parent)
     m_command = COMMAND_INVALID;
     program = "cmd"; //"powershell";
 
-    codec866 = QTextCodec::codecForName("CP866");
-    codec = QTextCodec::codecForName("CP1251");
+    codec866 = QTextCodec::codecForName(DEFAULT_CHARSET_);
+    codec = QTextCodec::codecForName(DEFAULT_CHARSET_WIN);
     QTextCodec::setCodecForLocale(codec);
 }
 

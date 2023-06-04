@@ -41,9 +41,8 @@ QString CertUser::user_name()
             else
                 return {};
         }
-    }else{
-        return {};
     }
+    return {};
 }
 
 win_user_info CertUser::getInfo() const

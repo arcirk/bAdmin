@@ -17,7 +17,8 @@ class DialogCertUserCache : public QDialog
 
 public:
     explicit DialogCertUserCache(arcirk::database::cert_users& obj, TreeViewModel * users_model,
-                                 const nlohmann::json&,
+                                 const nlohmann::json& hosts,
+                                 const QString& def_url = "ws://localhost:8080",
                                  QWidget *parent = nullptr);
     ~DialogCertUserCache();
 

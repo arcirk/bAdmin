@@ -6,7 +6,8 @@
 #include <QProcess>
 #include <QTextCodec>
 
-#define DEFAULT_CHARSET "CP866"
+#define DEFAULT_CHARSET_ "CP866"
+#define DEFAULT_CHARSET_WIN "CP1251"
 
 using namespace  arcirk::command_line;
 

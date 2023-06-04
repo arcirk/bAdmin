@@ -11,14 +11,14 @@ class DialogEdit;
 
 using json = nlohmann::json;
 
-class DialogEdit : public QDialog
+class DialogEditCertUser : public QDialog
 {
     Q_OBJECT
 
 public:
-    explicit DialogEdit(json& source, const QString& parent_name, QWidget *parent = nullptr);
-    explicit DialogEdit(json& source, const QString& parent_name, TreeViewModel* model, QWidget *parent = nullptr);
-    ~DialogEdit();
+    explicit DialogEditCertUser(arcirk::database::cert_users& source, const QString& parent_name, const json& dev, QWidget *parent = nullptr);
+    explicit DialogEditCertUser(arcirk::database::cert_users& source, const QString& parent_name, TreeViewModel* model, const json& dev, QWidget *parent = nullptr);
+    ~DialogEditCertUser();
 
     void accept() override;
 
@@ -31,7 +31,7 @@ private slots:
 
 private:
     Ui::DialogEdit *ui;
-    json& source_;
+    arcirk::database::cert_users& source_;
     arcirk::server::server_objects srv_object;
     int is_group;
     TreeViewModel* model_users;

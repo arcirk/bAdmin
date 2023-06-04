@@ -2,24 +2,24 @@
 #include "ui_dialogedit.h"
 #include <QUuid>
 #include "dialogselectintree.h"
+#include <QStringListModel>
 
-
-DialogEdit::DialogEdit(json& source, const QString& parent_name, QWidget *parent) :
+DialogEditCertUser::DialogEditCertUser(arcirk::database::cert_users& source, const QString& parent_name, const json& dev, QWidget *parent) :
     QDialog(parent),
     ui(new Ui::DialogEdit),
     source_(source)
 {
     ui->setupUi(this);
 
-    auto ref = source_.value("ref", NIL_STRING_UUID);
+    auto ref = source_.ref;
     if(ref.empty() || ref == NIL_STRING_UUID){
-        source_["ref"] = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
+        source_.ref = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
     }
-    auto first = source_.value("first", "");
-    auto second = source_.value("second", "");
-    is_group = source_.value("is_group", 0);
+    auto first = source_.first;
+    auto second = source_.second;
+    is_group = source_.is_group;
 
-    ui->lblUUID->setText(QString::fromStdString(source_["ref"].get<std::string>()));
+    ui->lblUUID->setText(QString::fromStdString(source_.ref));
     ui->txtFirst->setText(QString::fromStdString(first));
     ui->txtSecond->setText(QString::fromStdString(second));
     ui->chIsGroup->setCheckState(is_group == 0 ? Qt::Unchecked : Qt::Checked);
@@ -29,25 +29,34 @@ DialogEdit::DialogEdit(json& source, const QString& parent_name, QWidget *parent
 
     model_users = nullptr;
 
+    QStringList lst{""};
+    for (auto itr = dev.begin(); itr != dev.end(); ++itr) {
+        auto it = *itr;
+        lst.push_back(it["first"].get<std::string>().c_str());
+    }
+
+    auto lst_ = new QStringListModel(lst, this);
+    ui->cmbHosts->setModel(lst_);
+
     setWindowTitle("Пользователь");
 }
 
-DialogEdit::DialogEdit(json &source, const QString &parent_name, TreeViewModel *model, QWidget *parent) :
+DialogEditCertUser::DialogEditCertUser(arcirk::database::cert_users &source, const QString &parent_name, TreeViewModel *model, const json& dev, QWidget *parent) :
     QDialog(parent),
     ui(new Ui::DialogEdit),
     source_(source)
 {
     ui->setupUi(this);
 
-    auto ref = source_.value("ref", NIL_STRING_UUID);
+    auto ref = source_.ref;
     if(ref.empty() || ref == NIL_STRING_UUID){
-        source_["ref"] = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
+        source_.ref = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
     }
-    auto first = source_.value("first", "");
-    auto second = source_.value("second", "");
-    is_group = source_.value("is_group", 0);
+    auto first = source_.first;
+    auto second = source_.second;
+    is_group = source_.is_group;
 
-    ui->lblUUID->setText(QString::fromStdString(source_["ref"].get<std::string>()));
+    ui->lblUUID->setText(QString::fromStdString(source_.ref));
     ui->txtFirst->setText(QString::fromStdString(first));
     ui->txtSecond->setText(QString::fromStdString(second));
     ui->chIsGroup->setCheckState(is_group == 0 ? Qt::Unchecked : Qt::Checked);
@@ -57,18 +66,28 @@ DialogEdit::DialogEdit(json &source, const QString &parent_name, TreeViewModel *
 
     model_users = model;
 
+    QStringList lst{""};
+    for (auto itr = dev.begin(); itr != dev.end(); ++itr) {
+        auto it = *itr;
+        lst.push_back(it["first"].get<std::string>().c_str());
+    }
+
+    auto lst_ = new QStringListModel(lst, this);
+    ui->cmbHosts->setModel(lst_);
+
     setWindowTitle("Пользователь");
 }
 
-DialogEdit::~DialogEdit()
+DialogEditCertUser::~DialogEditCertUser()
 {
     delete ui;
 }
 
-void DialogEdit::accept()
+void DialogEditCertUser::accept()
 {
-    source_["first"] = ui->txtFirst->text().trimmed().toStdString();
-    source_["second"] = ui->txtSecond->text().trimmed().toStdString();
+    source_.first = ui->txtFirst->text().trimmed().toStdString();
+    source_.second = ui->txtSecond->text().trimmed().toStdString();
+    source_.host = ui->cmbHosts->currentText().toStdString();
 
 //    if(srv_object == arcirk::server::server_objects::CertUsers){
 //        source_["first"] = ui->txtFirst->text().toStdString();
@@ -77,12 +96,12 @@ void DialogEdit::accept()
     QDialog::accept();
 }
 
-void DialogEdit::setServerObject(arcirk::server::server_objects value)
+void DialogEditCertUser::setServerObject(arcirk::server::server_objects value)
 {
     srv_object = value;
 }
 
-void DialogEdit::formControl()
+void DialogEditCertUser::formControl()
 {
     bool v = is_group == 0 ? false : true;
     ui->lblHost->setVisible(!v);
@@ -92,7 +111,7 @@ void DialogEdit::formControl()
     ui->txtParentUserName->setVisible(!v);
 }
 
-void DialogEdit::on_btnSelectUser_clicked()
+void DialogEditCertUser::on_btnSelectUser_clicked()
 {
 
     if(!model_users)
@@ -103,7 +122,7 @@ void DialogEdit::on_btnSelectUser_clicked()
     dlg.exec();
     if(dlg.result() == QDialog::Accepted){
         auto sel_object = dlg.selectedObject();
-        source_["uuid"] = sel_object["ref"];
+        source_.uuid = sel_object["ref"].get<std::string>();
         ui->txtParentUserName->setText(sel_object["first"].get<std::string>().c_str());
         ui->txtFirst->setText(sel_object["first"].get<std::string>().c_str());
         ui->txtSecond->setText(sel_object["second"].get<std::string>().c_str());
@@ -113,7 +132,7 @@ void DialogEdit::on_btnSelectUser_clicked()
 }
 
 
-void DialogEdit::on_buttonBox_accepted()
+void DialogEditCertUser::on_buttonBox_accepted()
 {
     accept();
 }
