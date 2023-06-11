@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include "shared_struct.hpp"
+#include <QMap>
 
 using namespace arcirk::database;
 using json = nlohmann::json;

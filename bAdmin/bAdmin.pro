@@ -4,7 +4,8 @@ QT += core5compat
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
-CONFIG += c++20
+#CONFIG += c++20
+CONFIG += c++17
 
 #QMAKE_CXXFLAGS_DEBUG += /MTd
 #QMAKE_CXXFLAGS_RELEASE += /MT
@@ -22,6 +23,8 @@ SOURCES += \
     dialogcertusercache.cpp \
     dialogedit.cpp \
     dialoginfo.cpp \
+    dialogmplitem.cpp \
+    dialogmstsc.cpp \
     dialogselectdevice.cpp \
     dialogselectinlist.cpp \
     connectiondialog.cpp \
@@ -51,6 +54,8 @@ HEADERS += \
     dialogcertusercache.h \
     dialogedit.h \
     dialoginfo.h \
+    dialogmplitem.h \
+    dialogmstsc.h \
     dialogselectdevice.h \
     dialogselectinlist.h \
     connectiondialog.h \
@@ -76,6 +81,8 @@ FORMS += \
     dialogcertusercache.ui \
     dialogedit.ui \
     dialoginfo.ui \
+    dialogmplitem.ui \
+    dialogmstsc.ui \
     dialogselectdevice.ui \
     dialogselectinlist.ui \
     connectiondialog.ui \
@@ -104,10 +111,10 @@ INCLUDEPATH += $(BOOST_INCLDUE)
 #LIBS += -L$(BOOST_LIB) -lboost_locale-vc140-mt
 
 CONFIG(debug, debug|release) {
-    LIBS += -LC:/lib/vcpkg/installed/x64-windows/debug/lib -lboost_locale-vc140-mt-gd
+    LIBS += -LC:/lib/vcpkg/installed/x64-windows/debug/lib -lboost_locale-vc140-mt-gd -lfmtd
     LIBS += -LC:/lib/vcpkg/installed/x64-windows/debug/bin
 } else {
-    LIBS += -LC:/lib/vcpkg/installed/x64-windows/lib -lboost_locale-vc140-mt
+    LIBS += -LC:/lib/vcpkg/installed/x64-windows/lib -lboost_locale-vc140-mt -lfmt
     LIBS += -LC:/lib/vcpkg/installed/x64-windows/bin
 }
 

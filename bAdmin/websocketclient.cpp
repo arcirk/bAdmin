@@ -42,6 +42,11 @@ QString WebSocketClient::generateHash(const QString &usr, const QString &pwd)
     return get_hash(usr, pwd);
 }
 
+bool WebSocketClient::isStarted()
+{
+    return m_client->state() == QAbstractSocket::SocketState::ListeningState;
+}
+
 QString WebSocketClient::get_sha1(const QByteArray& p_arg){
     auto sha = QCryptographicHash::hash(p_arg, QCryptographicHash::Sha1);
     return sha.toHex();
@@ -109,6 +114,17 @@ server::server_config &WebSocketClient::server_conf()
 bool WebSocketClient::isConnected()
 {
     return m_isConnected;
+}
+
+QUrl WebSocketClient::url() const
+{
+    QString scheme = server_conf_.ServerSSL ? "wss" : "ws";
+    QUrl url_{};
+    url_.setHost(server_conf_.ServerHost.c_str());
+    url_.setPort(server_conf_.ServerPort);
+    url_.setScheme(scheme);
+
+    return url_;
 }
 
 void WebSocketClient::open()
@@ -192,7 +208,7 @@ void WebSocketClient::initialize()
 
     connect(m_client, QOverload<QAbstractSocket::SocketError>::of(&QWebSocket::error),
             [=](QAbstractSocket::SocketError error){
-        onError(error);
+        onError(error, m_client->errorString());
     });
 }
 
@@ -307,6 +323,87 @@ nlohmann::json WebSocketClient::exec_http_query(const std::string &command, cons
     //request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
     QString headerData = "Token " + QByteArray(conf_.hash.data()).toBase64();;
+    request.setRawHeader("Authorization", headerData.toLocal8Bit());
+
+    if(data.size() > 0){
+        //ByteArray bt = param["data"];
+        QStringList contentDisposition{"form-data"};
+        auto items = param.items();
+        for (auto itr = items.begin(); itr != items.end(); ++itr) {
+            auto val = *itr;
+            if(val.key() != "data"){
+                contentDisposition.append(QString("%1=\"%2\"").arg(val.key().c_str(), val.value().get<std::string>().c_str()));
+            }
+        }
+        request.setRawHeader("Content-Disposition", contentDisposition.join(";").toLocal8Bit());
+        QByteArray* q_data = new QByteArray(reinterpret_cast<const char*>(data.data()), data.size());
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "multipart/form-data");
+        httpService.post(request, *q_data);
+    }else{
+        auto http_param = arcirk::synchronize::http_param();
+        http_param.command = command;
+        http_param.param = QByteArray(param.dump().data()).toBase64().toStdString();
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+        httpService.post(request, QByteArray::fromStdString(pre::json::to_json(http_param).dump()));
+    }
+    loop.exec();
+
+    if(httpStatus != 200){
+        return false;
+    }
+
+    if(httpData.isEmpty())
+        return false;
+
+    if(httpData == "error"){
+         return false;
+    }
+
+    auto msg = pre::json::from_json<arcirk::server::server_response>(httpData.toStdString());
+
+    if(msg.result.empty())
+        return {};
+
+    try {
+        auto http_result = nlohmann::json::parse(QByteArray::fromBase64(msg.result.data()).toStdString());
+        return http_result;
+    } catch (...) {
+        return msg.result;
+    }
+
+}
+
+nlohmann::json WebSocketClient::http_query(const QUrl &ws, const QString &token, const std::string &command, const nlohmann::json &param, const ByteArray &data)
+{
+    QEventLoop loop;
+    int httpStatus = 200;
+    QByteArray httpData;
+    QNetworkAccessManager httpService;
+
+    auto finished = [&loop, &httpStatus, &httpData](QNetworkReply* reply) -> void
+    {
+       QVariant status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+       if(status_code.isValid()){
+           httpStatus = status_code.toInt();
+           if(httpStatus != 200){
+                qCritical() << QDateTime::currentDateTime().toString("hh:mm:ss") << __FUNCTION__ << "Error: " << httpStatus << " " + reply->errorString() ;
+           }else
+           {
+               httpData = reply->readAll();
+           }
+       }
+       loop.quit();
+
+    };
+
+    loop.connect(&httpService, &QNetworkAccessManager::finished, finished);
+
+    QString protocol = ws.scheme() == "wss" ? "https://" : "http://";
+    QString http_query = "/api/info";
+    QUrl url(protocol + ws.host() + ":" + QString::number(ws.port()) + http_query);
+    QNetworkRequest request(url);
+
+    QString headerData = "Token " + token.toUtf8().toBase64();
     request.setRawHeader("Authorization", headerData.toLocal8Bit());
 
     if(data.size() > 0){
@@ -476,6 +573,7 @@ void WebSocketClient::onConnected()
     param.hash = conf_.hash;
     param.device_id = conf_.device_id;
     param.product = QSysInfo::prettyProductName().toStdString();
+    param.system_user = system_user_.toStdString();
 
     std::string p = pre::json::to_json(param).dump();
     QByteArray ba(p.c_str());
@@ -508,9 +606,10 @@ void WebSocketClient::onTextMessageReceived(const QString &message)
     parse_response(message);
 }
 
-void WebSocketClient::onError(QAbstractSocket::SocketError error)
+void WebSocketClient::onError(QAbstractSocket::SocketError error, const QString& errorString)
 {
-    qDebug() << QDateTime::currentDateTime().toString("hh:mm:ss") << __FUNCTION__;
+    //qDebug() << QDateTime::currentDateTime().toString("hh:mm:ss") << __FUNCTION__ << errorString;
+    emit displayError("WebSocket", errorString);
 }
 
 void WebSocketClient::onReconnect()
@@ -548,5 +647,15 @@ void WebSocketClient::register_device(const arcirk::client::session_info& sess_i
 
 //        send_command(arcirk::server::server_commands::ExecuteSqlQuery, {
 //                         {"query_param", query_param}
-//                     });
+    //                     });
+}
+
+void WebSocketClient::set_system_user(const QString &value)
+{
+    system_user_ = value;
+}
+
+QUuid WebSocketClient::currentSession() const
+{
+    return m_currentSession;
 }

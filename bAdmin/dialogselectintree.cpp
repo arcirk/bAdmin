@@ -12,7 +12,7 @@ DialogSelectInTree::DialogSelectInTree(TreeViewModel* model, QWidget *parent) :
 
     for (int i = 0; i < model->columnCount(QModelIndex()); ++i) {
         auto key = model->get_column_name(i);
-        if(key != "name" && key != "size"){
+        if(key != "name" && key != "size" && key != "first"){
             ui->treeView->hideColumn(i);
         }
     }
@@ -44,11 +44,6 @@ DialogSelectInTree::DialogSelectInTree(TreeViewModel *model, QVector<QString> hi
     model->reset();
     ui->treeView->resizeColumnToContents(0);
 }
-
-//DialogSelectInTree::DialogSelectInTree(arcirk::server::server_objects srvObject, QVector<QString> hideColumns, QWidget *parent)
-//{
-
-//}
 
 DialogSelectInTree::~DialogSelectInTree()
 {
@@ -98,6 +93,11 @@ nlohmann::json DialogSelectInTree::selectedObject()
 void DialogSelectInTree::allow_sel_group(bool value)
 {
     allow_sel_group_ = value;
+}
+
+void DialogSelectInTree::set_window_text(const QString &value)
+{
+    setWindowTitle(value);
 }
 
 void DialogSelectInTree::on_treeView_doubleClicked(const QModelIndex &index)

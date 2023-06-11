@@ -24,6 +24,8 @@ public:
 
     void setServerObject(arcirk::server::server_objects value);
 
+    void set_1c_parent(const QString& name);
+
 private slots:
     void on_btnSelectUser_clicked();
 

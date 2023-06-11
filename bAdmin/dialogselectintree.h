@@ -16,7 +16,7 @@ class DialogSelectInTree : public QDialog
 public:
     explicit DialogSelectInTree(TreeViewModel* model, QWidget *parent = nullptr);
     explicit DialogSelectInTree(TreeViewModel* model, QVector<QString> hideColumns, QWidget *parent = nullptr);
-    //explicit DialogSelectInTree(arcirk::server::server_objects srvObject, QVector<QString> hideColumns, QWidget *parent = nullptr);
+
     ~DialogSelectInTree();
 
     QString file_name() const;
@@ -26,6 +26,8 @@ public:
     nlohmann::json selectedObject();
 
     void allow_sel_group(bool value);
+
+    void set_window_text(const QString& value);
 
 private slots:
     void on_treeView_doubleClicked(const QModelIndex &index);

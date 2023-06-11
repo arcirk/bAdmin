@@ -29,6 +29,10 @@
 #define DATABASE       "DATABASE"
 #define REMOTEBASE     "REMOTEBASE"
 
+#define CRYPT_KEY "my_key"
+
+#define APP_NAME "bAdmin"
+
 typedef unsigned char BYTE;
 typedef std::vector<BYTE> ByteArray;
 
@@ -60,6 +64,40 @@ namespace arcirk{
         }else
             return {};
     }
+
+    template<typename T>
+    T secure_serialization(const nlohmann::json &source)
+    {
+        if(!source.is_object())
+            return T();
+        nlohmann::json object = pre::json::to_json(T());
+
+        for (auto it = source.items().begin(); it != source.items().end(); ++it) {
+            if(object.find(it.key()) != object.end()){
+                if(it.value().type() == object[it.key()].type()){
+                    object[it.key()] = it.value();
+                }
+            }
+        }
+
+        return pre::json::from_json<T>(object);
+    }
+
+    template<typename T>
+    T internal_structure(const std::string &name, const nlohmann::json &source)
+    {
+        auto result = T();
+        try {
+            auto obg = source.value(name, nlohmann::json::object());
+            if(!obg.empty())
+                result = pre::json::from_json<T>(obg);
+        } catch (const std::exception& e) {
+           std::cerr <<  e.what() << std::endl;
+        }
+
+        return result;
+    }
+
     namespace uuids{
         inline std::string nil_string_uuid() {return "00000000-0000-0000-0000-000000000000";};
     }
@@ -122,17 +160,17 @@ namespace arcirk{
 }
 
 BOOST_FUSION_DEFINE_STRUCT(
-                (arcirk::services), task_options,
-                (std::string, uuid)
-                (std::string, name)
-                (std::string, synonum)
-                (bool, predefined)
-                (int, start_task)
-                (int, end_task)
-                (int, interval)
-                (bool, allowed)
-                (std::string, days_of_week)
-                (std::string, script)
+        (arcirk::services), task_options,
+        (std::string, uuid)
+        (std::string, name)
+        (std::string, synonum)
+        (bool, predefined)
+        (int, start_task)
+        (int, end_task)
+        (int, interval)
+        (bool, allowed)
+        (std::string, days_of_week)
+        (std::string, script)
 )
 
 BOOST_FUSION_DEFINE_STRUCT(
@@ -183,6 +221,44 @@ BOOST_FUSION_DEFINE_STRUCT(
         (std::string, info_base)
         (std::string, host_name)
         (std::string, product)
+        (std::string, system_user)
+)
+
+BOOST_FUSION_DEFINE_STRUCT(
+        (arcirk::client), mstsc_options,
+        (std::string, name)
+        (std::string, address)
+        (int, port)
+        (bool, def_port)
+        (bool, not_full_window)
+        (int, width)
+        (int, height)
+        (bool, reset_user)
+        (std::string, user_name)
+        (std::string, password)
+        (std::string, uuid)
+)
+BOOST_FUSION_DEFINE_STRUCT(
+        (arcirk::client), mpl_options,
+        (bool, use_firefox)
+        (std::string, firefox_path)
+        (std::string, profiles_path)
+        (ByteArray, mpl_list)
+        (ByteArray, mpl_profiles)
+)
+
+BOOST_FUSION_DEFINE_STRUCT(
+        (arcirk::client), mpl_item,
+        (std::string, profile)
+        (std::string, name)
+        (std::string, url)
+)
+
+BOOST_FUSION_DEFINE_STRUCT(
+        (arcirk::client), cryptopro_data,
+        (std::string, cryptopro_path)
+        (ByteArray, certs)
+        (ByteArray, conts)
 )
 
 BOOST_FUSION_DEFINE_STRUCT(
@@ -410,209 +486,209 @@ BOOST_FUSION_DEFINE_STRUCT(
 );
 
 BOOST_FUSION_DEFINE_STRUCT(
-    (arcirk::database), user_info,
-    (int, _id)
-    (std::string, first)
-    (std::string, second)
-    (std::string, ref)
-    (std::string, hash)
-    (std::string, role)
-    (std::string, performance)
-    (std::string, parent)
-    (std::string, cache)
-    (int, is_group)
-    (int, deletion_mark)
-    (int, version)
+        (arcirk::database), user_info,
+        (int, _id)
+        (std::string, first)
+        (std::string, second)
+        (std::string, ref)
+        (std::string, hash)
+        (std::string, role)
+        (std::string, performance)
+        (std::string, parent)
+        (std::string, cache)
+        (int, is_group)
+        (int, deletion_mark)
+        (int, version)
 );
 
 BOOST_FUSION_DEFINE_STRUCT(
-                (arcirk::database), messages,
-                (int, _id)
-                (std::string, first)
-                (std::string, second)
-                (std::string, ref)
-                (std::string, message)
-                (std::string, token)
-                (int, date)
-                (std::string, content_type)
-                (int, unread_messages)
-                (std::string, parent)
-                (int, is_group)
-                (int, deletion_mark)
-                (int, version)
+        (arcirk::database), messages,
+        (int, _id)
+        (std::string, first)
+        (std::string, second)
+        (std::string, ref)
+        (std::string, message)
+        (std::string, token)
+        (int, date)
+        (std::string, content_type)
+        (int, unread_messages)
+        (std::string, parent)
+        (int, is_group)
+        (int, deletion_mark)
+        (int, version)
 );
 
 BOOST_FUSION_DEFINE_STRUCT(
-                (arcirk::database), organizations,
-                (int, _id)
-                (std::string, first)
-                (std::string, second)
-                (std::string, ref)
-                (std::string, cache)
-                (std::string, parent)
-                (int, is_group)
-                (int, deletion_mark)
-                (int, version)
+        (arcirk::database), organizations,
+        (int, _id)
+        (std::string, first)
+        (std::string, second)
+        (std::string, ref)
+        (std::string, cache)
+        (std::string, parent)
+        (int, is_group)
+        (int, deletion_mark)
+        (int, version)
 );
 
 BOOST_FUSION_DEFINE_STRUCT(
-                (arcirk::database), subdivisions,
-                (int, _id)
-                (std::string, first)
-                (std::string, second)
-                (std::string, ref)
-                (std::string, cache)
-                (std::string, parent)
-                (int, is_group)
-                (int, deletion_mark)
-                (int, version)
+        (arcirk::database), subdivisions,
+        (int, _id)
+        (std::string, first)
+        (std::string, second)
+        (std::string, ref)
+        (std::string, cache)
+        (std::string, parent)
+        (int, is_group)
+        (int, deletion_mark)
+        (int, version)
 );
 
 BOOST_FUSION_DEFINE_STRUCT(
-                (arcirk::database), warehouses,
-                (int, _id)
-                (std::string, first)
-                (std::string, second)
-                (std::string, ref)
-                (std::string, cache)
-                (std::string, parent)
-                (int, is_group)
-                (int, deletion_mark)
-                (int, version)
+        (arcirk::database), warehouses,
+        (int, _id)
+        (std::string, first)
+        (std::string, second)
+        (std::string, ref)
+        (std::string, cache)
+        (std::string, parent)
+        (int, is_group)
+        (int, deletion_mark)
+        (int, version)
 );
 
 BOOST_FUSION_DEFINE_STRUCT(
-                (arcirk::database), price_types,
-                (int, _id)
-                (std::string, first)
-                (std::string, second)
-                (std::string, ref)
-                (std::string, cache)
-                (std::string, parent)
-                (int, is_group)
-                (int, deletion_mark)
-                (int, version)
+        (arcirk::database), price_types,
+        (int, _id)
+        (std::string, first)
+        (std::string, second)
+        (std::string, ref)
+        (std::string, cache)
+        (std::string, parent)
+        (int, is_group)
+        (int, deletion_mark)
+        (int, version)
 );
 
 BOOST_FUSION_DEFINE_STRUCT(
-                (arcirk::database), workplaces,
-                (int, _id)
-                (std::string, first)
-                (std::string, second)
-                (std::string, ref)
-                (std::string, cache)
-                (std::string, server)
-                (std::string, parent)
-                (int, is_group)
-                (int, deletion_mark)
-                (int, version)
+        (arcirk::database), workplaces,
+        (int, _id)
+        (std::string, first)
+        (std::string, second)
+        (std::string, ref)
+        (std::string, cache)
+        (std::string, server)
+        (std::string, parent)
+        (int, is_group)
+        (int, deletion_mark)
+        (int, version)
 );
 
 BOOST_FUSION_DEFINE_STRUCT(
-                (arcirk::database), devices,
-                (int, _id)
-                (std::string, first)
-                (std::string, second)
-                (std::string, ref)
-                (std::string, cache)
-                (std::string, deviceType)
-                (std::string, address)
-                (std::string, workplace)
-                (std::string, price_type)
-                (std::string, warehouse)
-                (std::string, subdivision)
-                (std::string, organization)
-                (std::string, parent)
-                (int, is_group)
-                (int, deletion_mark)
-                (int, version)
+        (arcirk::database), devices,
+        (int, _id)
+        (std::string, first)
+        (std::string, second)
+        (std::string, ref)
+        (std::string, cache)
+        (std::string, deviceType)
+        (std::string, address)
+        (std::string, workplace)
+        (std::string, price_type)
+        (std::string, warehouse)
+        (std::string, subdivision)
+        (std::string, organization)
+        (std::string, parent)
+        (int, is_group)
+        (int, deletion_mark)
+        (int, version)
 );
 
 BOOST_FUSION_DEFINE_STRUCT(
-                (arcirk::database), devices_view,
-                (std::string, ref)
-                (std::string, first)
-                (std::string, second)
-                (std::string, device_type)
-                (std::string, workplace)
-                (std::string, price)
-                (std::string, warehouse)
-                (std::string, subdivision)
-                (std::string, organization)
+        (arcirk::database), devices_view,
+        (std::string, ref)
+        (std::string, first)
+        (std::string, second)
+        (std::string, device_type)
+        (std::string, workplace)
+        (std::string, price)
+        (std::string, warehouse)
+        (std::string, subdivision)
+        (std::string, organization)
 );
 
 BOOST_FUSION_DEFINE_STRUCT(
-                (arcirk::database), documents,
-                (int, _id)
-                (std::string, first)
-                (std::string, second)
-                (std::string, ref)
-                (std::string, cache)
-                (std::string, number)
-                (int, date)
-                (std::string, xml_type)
-                (int, version)
-                (std::string, device_id)
-                (std::string, workplace)
-                (std::string, parent)
-                (int, is_group)
-                (int, deletion_mark)
+        (arcirk::database), documents,
+        (int, _id)
+        (std::string, first)
+        (std::string, second)
+        (std::string, ref)
+        (std::string, cache)
+        (std::string, number)
+        (int, date)
+        (std::string, xml_type)
+        (int, version)
+        (std::string, device_id)
+        (std::string, workplace)
+        (std::string, parent)
+        (int, is_group)
+        (int, deletion_mark)
 );
 
 BOOST_FUSION_DEFINE_STRUCT(
-                (arcirk::database), document_table,
-                (int, _id)
-                (std::string, first)
-                (std::string, second)
-                (std::string, ref)
-                (std::string, cache)
-                (double, price)
-                (double, quantity)
-                (std::string, barcode)
-                (std::string, product)
-                (std::string, parent)
-                (int, is_group)
-                (int, deletion_mark)
-                (int, version)
+        (arcirk::database), document_table,
+        (int, _id)
+        (std::string, first)
+        (std::string, second)
+        (std::string, ref)
+        (std::string, cache)
+        (double, price)
+        (double, quantity)
+        (std::string, barcode)
+        (std::string, product)
+        (std::string, parent)
+        (int, is_group)
+        (int, deletion_mark)
+        (int, version)
 );
 
 BOOST_FUSION_DEFINE_STRUCT(
-                (arcirk::database), nomenclature,
-                (int, _id)
-                (std::string, first) // Наименование
-                (std::string, second)
-                (std::string, ref)
-                (std::string, cache) // Все остальные реквизиты
-                (std::string, parent)
-                (std::string, vendor_code)
-                (std::string, trademark)
-                (std::string, unit)
-                (int, is_group)
-                (int, deletion_mark)
-                (int, version)
+        (arcirk::database), nomenclature,
+        (int, _id)
+        (std::string, first) // Наименование
+        (std::string, second)
+        (std::string, ref)
+        (std::string, cache) // Все остальные реквизиты
+        (std::string, parent)
+        (std::string, vendor_code)
+        (std::string, trademark)
+        (std::string, unit)
+        (int, is_group)
+        (int, deletion_mark)
+        (int, version)
 );
 
 BOOST_FUSION_DEFINE_STRUCT(
-                (arcirk::database), barcodes,
-                (int, _id)
-                (std::string, first)
-                (std::string, second)
-                (std::string, ref)
-                (std::string, barcode)
-                (std::string, parent)
-                (int, is_group)
-                (int, deletion_mark)
-                (int, version)
+        (arcirk::database), barcodes,
+        (int, _id)
+        (std::string, first)
+        (std::string, second)
+        (std::string, ref)
+        (std::string, barcode)
+        (std::string, parent)
+        (int, is_group)
+        (int, deletion_mark)
+        (int, version)
 );
 
 BOOST_FUSION_DEFINE_STRUCT(
-                (arcirk::database), table_info_sqlite,
-                (int, cid)
-                (std::string, name)
-                (std::string, type)
-                (int, notnull)
-                (std::string, dflt_value)
-                (int, bk)
+        (arcirk::database), table_info_sqlite,
+        (int, cid)
+        (std::string, name)
+        (std::string, type)
+        (int, notnull)
+        (std::string, dflt_value)
+        (int, bk)
 );
 
 BOOST_FUSION_DEFINE_STRUCT(
@@ -667,6 +743,7 @@ BOOST_FUSION_DEFINE_STRUCT(
         (std::string, cache)
         (std::string, uuid)
         (std::string, sid)
+        (std::string, system_user)
         (std::string, host)
         (std::string, parent)
         (int, is_group)

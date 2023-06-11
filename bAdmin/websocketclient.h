@@ -8,6 +8,7 @@
 #include "shared_struct.hpp"
 #include <QQueue>
 #include <functional>
+#include <QTimer>
 
 using namespace arcirk;
 
@@ -30,6 +31,8 @@ public:
 
     bool isConnected();
 
+    QUrl url() const;
+
     void open();
     void close();
     void write_conf();
@@ -39,6 +42,7 @@ public:
                                          const nlohmann::json &param = {});
 
     nlohmann::json exec_http_query(const std::string& command, const nlohmann::json& param, const ByteArray& data = {});
+    static nlohmann::json http_query(const QUrl& ws, const QString& token, const std::string& command, const nlohmann::json& param, const ByteArray& data = {});
 
     QByteArray exec_http_query_get(const std::string& command, const nlohmann::json& param);
 
@@ -55,10 +59,15 @@ public:
 
     void register_device(const arcirk::client::session_info& sess_info);
 
+    void set_system_user(const QString& value);
+
+    QUuid currentSession() const;
+
 private:
     client::client_conf conf_;
     server::server_config server_conf_;
     QWebSocket* m_client;
+    QString system_user_;
 
     QUuid m_currentSession;
     QUuid m_currentUserUuid;
@@ -105,7 +114,7 @@ private slots:
     void onConnected();
     void onDisconnected();
     void onTextMessageReceived(const QString &message);
-    void onError(QAbstractSocket::SocketError error);
+    void onError(QAbstractSocket::SocketError error, const QString& errorString);
     void onReconnect();
 
 };

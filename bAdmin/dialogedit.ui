@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>454</width>
-    <height>252</height>
+    <height>282</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,75 +16,7 @@
   <layout class="QGridLayout" name="gridLayout_2">
    <item row="0" column="0">
     <layout class="QGridLayout" name="gridLayout">
-     <item row="2" column="0">
-      <widget class="QLabel" name="label_3">
-       <property name="text">
-        <string>Наименование:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="0" column="0">
-      <widget class="QLabel" name="label">
-       <property name="text">
-        <string>Идентификатор:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="3" column="0">
-      <widget class="QLabel" name="label_4">
-       <property name="text">
-        <string>Представление:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="1">
-      <widget class="QLineEdit" name="txtFirst"/>
-     </item>
-     <item row="5" column="0">
-      <widget class="QLabel" name="lblHost">
-       <property name="text">
-        <string>Хост:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="3" column="1">
-      <widget class="QLineEdit" name="txtSecond"/>
-     </item>
-     <item row="5" column="1">
-      <widget class="QComboBox" name="cmbHosts"/>
-     </item>
-     <item row="4" column="1">
-      <widget class="QLineEdit" name="txtParent">
-       <property name="enabled">
-        <bool>false</bool>
-       </property>
-      </widget>
-     </item>
-     <item row="6" column="0">
-      <widget class="QCheckBox" name="chIsGroup">
-       <property name="enabled">
-        <bool>false</bool>
-       </property>
-       <property name="text">
-        <string>Это группа</string>
-       </property>
-      </widget>
-     </item>
-     <item row="0" column="1">
-      <widget class="QLabel" name="lblUUID">
-       <property name="text">
-        <string/>
-       </property>
-      </widget>
-     </item>
-     <item row="4" column="0">
-      <widget class="QLabel" name="label_2">
-       <property name="text">
-        <string>Родитель:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="7" column="1">
+     <item row="8" column="1">
       <spacer name="verticalSpacer">
        <property name="orientation">
         <enum>Qt::Vertical</enum>
@@ -97,10 +29,61 @@
        </property>
       </spacer>
      </item>
-     <item row="1" column="0">
-      <widget class="QLabel" name="lblParentUserName">
+     <item row="0" column="1">
+      <widget class="QLabel" name="lblUUID">
        <property name="text">
-        <string>Пользователь 1С:</string>
+        <string/>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="0">
+      <widget class="QLabel" name="label_4">
+       <property name="text">
+        <string>Представление:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="1">
+      <widget class="QLineEdit" name="txtParent">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="0">
+      <widget class="QLabel" name="label">
+       <property name="text">
+        <string>Идентификатор:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="1">
+      <widget class="QLineEdit" name="txtFirst"/>
+     </item>
+     <item row="7" column="0">
+      <widget class="QCheckBox" name="chIsGroup">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="text">
+        <string>Это группа</string>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="0">
+      <widget class="QLabel" name="label_2">
+       <property name="text">
+        <string>Родитель:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="6" column="1">
+      <widget class="QComboBox" name="cmbHosts"/>
+     </item>
+     <item row="2" column="0">
+      <widget class="QLabel" name="label_3">
+       <property name="text">
+        <string>Наименование:</string>
        </property>
       </widget>
      </item>
@@ -121,6 +104,33 @@
         </widget>
        </item>
       </layout>
+     </item>
+     <item row="6" column="0">
+      <widget class="QLabel" name="lblHost">
+       <property name="text">
+        <string>Хост:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="1">
+      <widget class="QLineEdit" name="txtSecond"/>
+     </item>
+     <item row="1" column="0">
+      <widget class="QLabel" name="lblParentUserName">
+       <property name="text">
+        <string>Пользователь 1С:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="5" column="0">
+      <widget class="QLabel" name="lblSystemUser">
+       <property name="text">
+        <string>Пользователь ОС:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="5" column="1">
+      <widget class="QLineEdit" name="txtSystemUser"/>
      </item>
     </layout>
    </item>

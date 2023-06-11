@@ -60,10 +60,8 @@ nlohmann::json TreeViewModel::http_data(const QString &parentUuid) const{
     QString headerData = "Token " + authString_;
     request.setRawHeader("Authorization", headerData.toLocal8Bit());
 
-//    auto bt = arcirk::string_to_byte_array(pre::json::to_json(http_param).dump());
-//    QByteArray* q_data = new QByteArray(reinterpret_cast<const char*>(bt.data()), bt.size());
     httpService.post(request, QByteArray::fromStdString(pre::json::to_json(http_param).dump()));
-    //httpService.post(request, *q_data);
+
     loop.exec();
 
     if(httpStatus != 200){
@@ -94,18 +92,22 @@ nlohmann::json TreeViewModel::getNodeData(const QString &parentUuid) const
 
     using namespace arcirk::database;
     auto query = builder::query_builder();
-    //nlohmann::json{"first","second","ref","parent", "is_group", "deletion_mark"}
+
     auto cols = nlohmann::json::array();
     foreach (auto &itr, columns) {
         cols += itr.toStdString();
     }
-    std::string query_text = query.select(cols).from(table_name_.toStdString()).where(nlohmann::json{
-                                                                       {"parent", parentUuid.toStdString()}
-                                                                   }, true).order_by(nlohmann::json{{"is_group", 1}}).prepare();//,{"first", 0}
+    auto where = nlohmann::json::object({
+                                           {"parent", parentUuid.toStdString()}
+                                        });
+
+    if(group_only_){
+        where["is_group"] = 1;
+    }
+    std::string query_text = query.select(cols).from(table_name_.toStdString()).where(where, true).order_by(nlohmann::json{{"is_group", 1}}).prepare();//,{"first", 0}
 
     auto param = nlohmann::json::object();
     param["query_text"] = query_text;
-    //param["empty_column"] = true;
 
     auto http_param = arcirk::synchronize::http_param();
     http_param.command = arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery);
@@ -144,11 +146,7 @@ nlohmann::json TreeViewModel::getNodeData(const QString &parentUuid) const
     QString headerData = "Token " + authString_;
     request.setRawHeader("Authorization", headerData.toLocal8Bit());
 
-//    auto bt = arcirk::string_to_byte_array(pre::json::to_json(http_param).dump());
-//    QByteArray* q_data = new QByteArray(reinterpret_cast<const char*>(bt.data()), bt.size());
     httpService.post(request, QByteArray::fromStdString(pre::json::to_json(http_param).dump()));
-    //httpService.post(request, *q_data);
-    //httpService.post(request, QByteArray::fromStdString(pre::json::to_json(http_param).dump()));
     loop.exec();
 
     if(httpStatus != 200){
@@ -199,6 +197,24 @@ TreeViewModel::TreeViewModel(const arcirk::client::client_conf& conf, QObject *p
     item_icons.insert(item_icons_enum::DeletedItem, QIcon(":/img/deletionMarkItem.png"));
 
     is_loaded_ = false;
+    group_only_ = false;
+
+    column_aliases = {};
+    server_object_ = arcirk::server::server_objects::OBJ_INVALID;
+}
+
+TreeViewModel::TreeViewModel(QObject *parent)
+    : QAbstractItemModel{parent}
+{
+    conf_ = arcirk::client::client_conf();
+    item_icons.insert(item_icons_enum::ItemGroup, QIcon(":/img/group.png"));
+    item_icons.insert(item_icons_enum::Item, QIcon(":/img/item.png"));
+    item_icons.insert(item_icons_enum::DeletedItemGroup, QIcon(":/img/groupDeleted.png"));
+    item_icons.insert(item_icons_enum::DeletedItem, QIcon(":/img/deletionMarkItem.png"));
+
+    is_loaded_ = false;
+    group_only_ = false;
+
     column_aliases = {};
     server_object_ = arcirk::server::server_objects::OBJ_INVALID;
 }
@@ -405,12 +421,36 @@ bool TreeViewModel::setData(const QModelIndex &index, const QVariant &value, int
     if (!index.isValid()) {
         return false;
     }
-    if (role != Qt::EditRole) {
-        return false;
-    }
+//    if (role != Qt::EditRole) {
+//        return false;
+//    }
 //	if (index.column() != NameColumn) {
 //		return false;
 //	}
+    auto column_name = get_column_name(role);
+    nlohmann::json val;
+    if(value.typeId() == QMetaType::QString){
+        val = value.toString().toStdString();
+    }else if(value.typeId() == QMetaType::Int){
+        val = value.toInt();
+    }else if(value.typeId() == QMetaType::Double){
+        val = value.toDouble();
+    }else if(value.typeId() == QMetaType::Float){
+        val = value.toFloat();
+    }else if(value.typeId() == QMetaType::Bool){
+        val = value.toBool();
+    }else
+        val = "";
+    NodeInfo* nodeInfo = static_cast<NodeInfo*>(index.internalPointer());
+    Q_ASSERT(nodeInfo != 0);
+//    auto object = nodeInfo->rowData;
+//    nodeInfo->rowData = object;
+    emit dataChanged(index, index.sibling(index.row(), columns.size()));
+    try {
+        nodeInfo->rowData[column_name.toStdString()] = val;
+    } catch (...) {
+        return false;
+    }
 
 //	QString newName = value.toString();
 //	if (newName.contains('/') || newName.contains(QDir::separator())) {
@@ -423,7 +463,7 @@ bool TreeViewModel::setData(const QModelIndex &index, const QVariant &value, int
 //	bool renamed = QFile::rename(fullOldName, fullNewName);
 //	qDebug() << renamed;
 //	if (renamed) {
-//		nodeInfo->fileInfo = QFileInfo(fullNewName);
+//        nodeInfo->rowData. = QFileInfo(fullNewName);
 //		emit dataChanged(index, index.sibling(index.row(), ColumnCount));
 //	}
 //	return renamed;
@@ -504,7 +544,7 @@ void TreeViewModel::fetchMore(const QModelIndex &parent)
         }
     }
 
-
+    emit fetch();
 }
 
 void TreeViewModel::set_table(const nlohmann::json& tableModel){
@@ -597,7 +637,7 @@ void TreeViewModel::add(const nlohmann::json object, const QModelIndex &parent)
     }else{
         int insrtCnt = parentInfo->children.size() - 1;
         if (insrtCnt < 0) {
-            insrtCnt = 1;
+            insrtCnt = 0;
         }
         beginInsertRows(parent, 0, insrtCnt);
         NodeInfo nodeInfo(object, parentInfo);
@@ -639,6 +679,59 @@ QModelIndex TreeViewModel::find_in_table(QAbstractItemModel *model, const QStrin
     }
 
     return QModelIndex();
+}
+
+void TreeViewModel::move_up(const QModelIndex &index)
+{
+    Q_ASSERT(index.isValid());
+    if(index.row() < 1)
+        return;
+
+    beginMoveRows(index.parent(), index.row(), index.row(), index.parent(), index.row()-1);
+    NodeInfo* itemInfo = static_cast<NodeInfo*>(index.internalPointer());
+    Q_ASSERT(itemInfo != 0);
+    NodeInfo* parentInfo = itemInfo->parent;
+    auto pos = findRow(itemInfo);
+
+    if(parentInfo != 0)
+        parentInfo->children.move(pos, pos - 1);
+    else
+        _nodes.move(pos, pos - 1);
+
+    endMoveRows();
+}
+
+void TreeViewModel::move_down(const QModelIndex &index)
+{
+    Q_ASSERT(index.isValid());
+    if(index.row() > rowCount(index.parent()) - 2)
+        return;
+
+
+    NodeInfo* itemInfo = static_cast<NodeInfo*>(index.internalPointer());
+    Q_ASSERT(itemInfo != 0);
+    NodeInfo* parentInfo = itemInfo->parent;
+    auto pos = findRow(itemInfo);
+
+    if(parentInfo != 0){
+        beginMoveRows(index.parent(), pos, pos, index.parent(), (pos >= parentInfo->children.size()) ? parentInfo->children.size() : (pos + 2));
+        parentInfo->children.move(pos, pos + 1);
+    }else{
+        beginMoveRows(index.parent(), pos, pos, index.parent(), (pos >= _nodes.size()) ? _nodes.size() : (pos + 2));
+        _nodes.move(pos, pos + 1);
+    }
+
+    endMoveRows();
+}
+
+void TreeViewModel::set_group_only(bool value)
+{
+    group_only_ = value;
+}
+
+bool TreeViewModel::group_only() const
+{
+    return group_only_;
 }
 
 void TreeViewModel::set_current_parent_path(const QString &value)
@@ -858,6 +951,23 @@ nlohmann::json TreeViewModel::get_objects(const QModelIndex &parent) const
 
     return result;
 
+}
+
+nlohmann::json TreeViewModel::get_table_model(const QModelIndex &parent) const
+{
+    using json = nlohmann::json;
+    auto roles = roleNames();
+    auto columns_j = json::array();
+    foreach (const auto& key , roles.keys()) {
+        columns_j += roles[key].toStdString();
+    }
+
+    auto rows = get_objects(parent);
+
+    return json::object({
+        {"columns" , columns_j},
+        {"rows", rows}
+    });
 }
 
 void TreeViewModel::clear()

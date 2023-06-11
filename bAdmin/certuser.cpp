@@ -6,6 +6,8 @@
 #include "cryptcertificate.h"
 #include "commandline.h"
 #include "commandlineparser.h"
+#include <QSettings>
+#include "websocketclient.h"
 
 CertUser::CertUser(QObject *parent)
     : QObject{parent}
@@ -283,4 +285,81 @@ nlohmann::json CertUser::get_local_containers()
    auto info = CommandLineParser::parse(result_.c_str(), csptestGetConteiners);
 
    return info;
+}
+
+QStringList CertUser::read_mozilla_profiles()
+{
+
+    auto path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    path.remove(APP_NAME);
+    path.append("Mozilla/Firefox/profiles.ini");
+
+    QDir::toNativeSeparators(QDir::homePath() + "/AppData/Roaming/Mozilla/Firefox/profiles.ini");
+
+    QFile file(path);
+    if(!file.exists())
+        return {};
+
+    QStringList result{};
+
+    QSettings ini = QSettings(file.fileName(), QSettings::IniFormat);
+    QStringList keys = ini.allKeys();
+    foreach(const QString& key, keys){
+        if(key.compare("Profile")){
+            if(key.endsWith("/Name")){
+                result.append(ini.value(key).toString());
+            }
+        }
+    }
+
+    return result;
+
+}
+
+void CertUser::set_database_cache(const std::string &data_str)
+{
+    try {
+        data_ = json::parse(data_str);
+    } catch (const std::exception& e) {
+        data_ = json::object();
+        qCritical() << e.what();
+    }
+}
+
+void CertUser::read_database_cache(const QUrl &ws, const QString& token)
+{
+    json query_param = {
+        {"table_name", arcirk::enum_synonym(tables::tbCertUsers)},
+        {"query_type", "select"},
+        {"values", json::array({"cache"})},
+        {"where_values", json::object({
+             {"host", host().toStdString()},
+             {"system_user", user_name().toStdString()}
+         })}
+    };
+
+    std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+    auto resp = WebSocketClient::http_query(ws, token, arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery), json{
+                                         {"query_param", base64_param}
+                                     });
+
+    data_ = json::object();
+
+    try {
+        if(resp.is_object()){
+            auto rows = resp.value("rows", json::array());
+            if(rows.size() != 0){
+                data_ = json::parse(rows[0]["cache"].get<std::string>());
+            }
+        }
+    } catch (const std::exception& e) {
+        data_ = json::object();
+        qCritical() << e.what();
+    }
+
+}
+
+json CertUser::cache() const
+{
+    return data_;
 }

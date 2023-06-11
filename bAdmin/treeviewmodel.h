@@ -19,6 +19,7 @@ class TreeViewModel : public QAbstractItemModel
     Q_OBJECT
 public:
     explicit TreeViewModel(const arcirk::client::client_conf& conf, QObject *parent = nullptr);
+    explicit TreeViewModel(QObject *parent = nullptr);
     ~TreeViewModel();
     QModelIndex index(int row, int column, const QModelIndex &parent) const override;
     QModelIndex parent(const QModelIndex &child) const override;
@@ -45,6 +46,7 @@ public:
     arcirk::server::server_objects server_object() const;
     nlohmann::json get_object(const QModelIndex &index) const;
     nlohmann::json get_objects(const QModelIndex &parent) const;
+    nlohmann::json get_table_model(const QModelIndex &parent) const;
     void set_rows_icon(const QIcon &ico);
     void set_icon(const QModelIndex& index, const QIcon &ico);
 
@@ -57,13 +59,19 @@ public:
 
     void refresh(const QModelIndex& parent);
 
-    void remove(const QModelIndex &parent);
-    void add(const nlohmann::json object, const QModelIndex &parent);
+    void remove(const QModelIndex &index);
+    void add(const nlohmann::json object, const QModelIndex &parent = QModelIndex());
     void set_object(const QModelIndex &index, const nlohmann::json& object);
 
     void use_hierarchy(const std::string& column);
 
     static QModelIndex find_in_table(QAbstractItemModel * model, const QString& value, int column, int role = Qt::DisplayRole, bool findData = false);
+
+    void move_up(const QModelIndex &index);
+    void move_down(const QModelIndex &index);
+
+    void set_group_only(bool value);
+    bool group_only() const;
 
 private:
     arcirk::server::server_objects server_object_;
@@ -77,7 +85,7 @@ private:
     QMap<QString, QString> column_aliases;
     bool is_loaded_;
     std::string use_hierarchy_;
-
+    bool group_only_;
     QString current_parent_path_;
 
     void set_current_parent_path(const QString& value);
@@ -94,6 +102,9 @@ private:
     QVariant get_value(const nlohmann::json &node, int col = 0) const;
     nlohmann::json http_data(const QString &parentUuid) const;
     bool field_is_exists(const nlohmann::json &object, const std::string &name) const;
+
+signals:
+    void fetch();
 
 };
 

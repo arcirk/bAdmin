@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
+    <width>862</width>
     <height>600</height>
    </rect>
   </property>
@@ -323,6 +323,40 @@
         </widget>
        </item>
        <item>
+        <widget class="QToolButton" name="btnRegistryUser">
+         <property name="toolTip">
+          <string>Зарегистрировать пользователя</string>
+         </property>
+         <property name="text">
+          <string>...</string>
+         </property>
+         <property name="icon">
+          <iconset resource="resurses.qrc">
+           <normaloff>:/img/certUsers.png</normaloff>:/img/certUsers.png</iconset>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="btnEditCache">
+         <property name="toolTip">
+          <string>Параметры пользователя</string>
+         </property>
+         <property name="text">
+          <string>...</string>
+         </property>
+         <property name="icon">
+          <iconset resource="resurses.qrc">
+           <normaloff>:/img/userOptions.ico</normaloff>:/img/userOptions.ico</iconset>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QLabel" name="label_5">
          <property name="maximumSize">
           <size>
@@ -389,6 +423,27 @@
         </spacer>
        </item>
       </layout>
+      <zorder>btnRegistryUser</zorder>
+      <zorder>label</zorder>
+      <zorder>btnAdd</zorder>
+      <zorder>btnAddGroup</zorder>
+      <zorder>btnEdit</zorder>
+      <zorder>btnDelete</zorder>
+      <zorder>btnSendClientRelease</zorder>
+      <zorder>label_2</zorder>
+      <zorder>btnInfo</zorder>
+      <zorder>label_6</zorder>
+      <zorder>toolButton</zorder>
+      <zorder>label_3</zorder>
+      <zorder>btnDataImport</zorder>
+      <zorder>btnDataExport</zorder>
+      <zorder>label_4</zorder>
+      <zorder>btnSetLinkDevice</zorder>
+      <zorder>btnRegistryDevice</zorder>
+      <zorder>label_5</zorder>
+      <zorder>btnTaskRestart</zorder>
+      <zorder>btnStartTask</zorder>
+      <zorder>btnEditCache</zorder>
      </widget>
     </item>
     <item row="1" column="0">
@@ -408,7 +463,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>800</width>
+     <width>862</width>
      <height>21</height>
     </rect>
    </property>

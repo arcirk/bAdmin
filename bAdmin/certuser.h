@@ -6,6 +6,7 @@
 
 using namespace arcirk::cryptography;
 using namespace arcirk::database;
+using json = nlohmann::json;
 
 class CertUser : public QObject
 {
@@ -27,17 +28,28 @@ public:
 
     QString getCryptoProCSP() const;
 
+    static QStringList read_mozilla_profiles();
+
+    void set_database_cache(const std::string& data_str);
+
+    void read_database_cache(const QUrl &ws, const QString& token);
+
+    json cache() const;
 
 private:
     win_user_info user_info_;
     cert_users cert_user_;
+    json data_;
+
     bool is_valid_;
     bool is_localhost_;
 
     void get_sid();
 
-    nlohmann::json get_local_certificates(bool brief);
-    nlohmann::json get_local_containers();
+    json get_local_certificates(bool brief);
+    json get_local_containers();
+
+
 
 signals:
 

@@ -24,6 +24,10 @@
 #include "dialoginfo.h"
 #include "dialogedit.h"
 #include "dialogcertusercache.h"
+#include <QClipboard>
+#include "dialogselectintree.h"
+#include "commandline.h"
+#include <fmt/core.h>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -31,11 +35,20 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
+    this->createTrayActions();
+    this->createTrayIcon();
+    this->trayIcon->show();
+
+    current_user = new CertUser(this);
+    current_user->setLocalhost(true);
+
     m_client = new WebSocketClient(this);
     connect(m_client, &WebSocketClient::connectionChanged, this, &MainWindow::connectionChanged);
     connect(m_client, &WebSocketClient::connectionSuccess, this, &MainWindow::connectionSuccess);
     connect(m_client, &WebSocketClient::displayError, this, &MainWindow::displayError);
     connect(m_client, &WebSocketClient::serverResponse, this, &MainWindow::serverResponse);
+
+    m_client->set_system_user(current_user->user_name());
 
     if(!m_client->conf().is_auto_connect)
         openConnectionDialog();
@@ -46,12 +59,22 @@ MainWindow::MainWindow(QWidget *parent)
 
     formControl();
 
-    fillDefaultTree();;
-
-    current_user = new CertUser(this);
-    current_user->setLocalhost(true);
+    fillDefaultTree();
 
     setWindowTitle(QString("Менеджер сервера (%1)").arg(current_user->getInfo().user.c_str()));
+
+    ui->treeView->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(ui->treeView, &QTreeView::customContextMenuRequested, [&](const QPoint& pos) {
+
+        QModelIndex index = ui->treeView->indexAt(pos);
+        QMenu menu;
+
+        menu.addAction(tr("Копировать"), ui->treeView, [&, index]() {
+            QApplication::clipboard()->setText( index.data().toString() );
+        });
+        menu.exec(ui->treeView->viewport()->mapToGlobal(pos));
+    });
+
 
 }
 
@@ -90,12 +113,19 @@ void MainWindow::reconnect()
 
 void MainWindow::displayError(const QString &what, const QString &err)
 {
+    qCritical() << __FUNCTION__ << what << ": " << err ;
 
+    QIcon msgIcon(":/img/h.png");
+    trayIcon->showMessage(what, err, msgIcon,
+                          3 * 1000);
 }
 
 void MainWindow::connectionSuccess()
 {
     createModels();
+
+    current_user->read_database_cache(m_client->url(), m_client->conf().hash.c_str());
+
     get_online_users();
     if(m_models.find(arcirk::server::DatabaseUsers) == m_models.end()){
         m_models.insert(arcirk::server::DatabaseUsers, new TreeViewModel(m_client->conf(), this));
@@ -106,9 +136,10 @@ void MainWindow::connectionSuccess()
         ui->treeView->setUniformRowHeights(true);
         ui->treeView->setModel(m_models[arcirk::server::DatabaseUsers]);
     }
-//    auto tree = ui->treeWidget;
-//    if(tree->topLevelItem(0))
 
+    trayShowMessage(QString("Успешное подключение к севрверу: %1:%2").arg(m_client->server_conf().ServerHost.c_str(), QString::number(m_client->server_conf().ServerPort)));
+
+    createDynamicMenu();
 }
 
 void MainWindow::connectionChanged(bool state)
@@ -120,7 +151,6 @@ void MainWindow::connectionChanged(bool state)
 
     if(!state){
         infoBar->setText("Не подключен");
-        tree->topLevelItem(0)->setText(0, "Не подключен");
         tree->clear();
         ui->treeView->setModel(nullptr);
     }else{
@@ -210,6 +240,199 @@ void MainWindow::serverResponse(const arcirk::server::server_response &message)
     }
 }
 
+void MainWindow::onCertUserCache(const QUrl &ws, const QString &host, const QString &system_user, QWidget *parent)
+{
+    Q_UNUSED(parent);
+
+    //Процедура использутеся в mpl поэтому статичная http_query
+
+    using json = nlohmann::json;
+    try {
+        json query_param = {
+            {"table_name", arcirk::enum_synonym(tables::tbCertUsers)},
+            {"query_type", "select"},
+            {"values", json::array({"cache"})},
+            {"where_values", json::object({
+                 {"host", host.toStdString()},
+                 {"system_user", system_user.toStdString()}
+             })}
+        };
+        QString token = m_client->conf().hash.c_str();
+        std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+        auto resp = WebSocketClient::http_query(ws, token, arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery), json{
+                                             {"query_param", base64_param}
+                                         });
+
+        if(resp.is_object()){
+            auto rows = resp.value("rows", json::array());
+            if(rows.size() == 0){
+                emit displayError("Ошибка", "Ошибка получения данных пользователя!");
+            }else{
+                auto cache = json::parse(rows[0]["cache"].get<std::string>());
+                emit certUserData(host, system_user, cache);
+            }
+        }else
+            emit displayError("Ошибка", "Ошибка получения данных пользователя!");
+    } catch (...) {
+        emit displayError("Ошибка", "Ошибка получения данных пользователя!");
+    }
+
+}
+
+void MainWindow::onMozillaProfiles(const QString &host, const QString &system_user)
+{
+    auto model_online_users = m_models[arcirk::server::server_objects::OnlineUsers];
+    bool is_online = false;
+    arcirk::client::session_info struct_obj;
+    for (auto i = 0; i < model_online_users->rowCount(QModelIndex()) ; ++i) {
+        auto object = model_online_users->get_object(model_online_users->index(i,0, QModelIndex()));
+        struct_obj = pre::json::from_json<arcirk::client::session_info>(object);
+        if(struct_obj.host_name == host.toStdString() && struct_obj.system_user == system_user.toStdString()){
+            is_online = true;
+            break;
+        }
+    }
+
+    if(!is_online)
+        QMessageBox::critical(this, "Ошибка", "Клиент не в сети!");
+    else{
+        if(struct_obj.session_uuid == m_client->currentSession().toString(QUuid::WithoutBraces).toStdString()){
+            auto lst = CertUser::read_mozilla_profiles();
+            lst.insert(0, " ");
+            emit mozillaProfiles(lst);
+        }else
+            m_client->command_to_client(struct_obj.session_uuid.c_str(), "GetMozillaProfilesList");
+    }
+}
+
+void MainWindow::doGetCertUserCertificates(const QString &host, const QString &system_user)
+{
+    auto model_online_users = m_models[arcirk::server::server_objects::OnlineUsers];
+    bool is_online = false;
+    arcirk::client::session_info struct_obj;
+    for (auto i = 0; i < model_online_users->rowCount(QModelIndex()) ; ++i) {
+        auto object = model_online_users->get_object(model_online_users->index(i,0, QModelIndex()));
+        struct_obj = pre::json::from_json<arcirk::client::session_info>(object);
+        if(struct_obj.host_name == host.toStdString() && struct_obj.system_user == system_user.toStdString()){
+            is_online = true;
+            break;
+        }
+    }
+
+    if(!is_online)
+        QMessageBox::critical(this, "Ошибка", "Клиент не в сети!");
+    else{
+        if(struct_obj.session_uuid == m_client->currentSession().toString(QUuid::WithoutBraces).toStdString()){
+            auto table = current_user->getCertificates(true);
+            auto ba = arcirk::string_to_byte_array(table.dump());
+            auto result = arcirk::client::cryptopro_data();
+            result.certs = ByteArray(ba.size());
+            std::copy(ba.begin(), ba.end(), result.certs.begin());
+            emit certUserCertificates(result);
+        }else
+            m_client->command_to_client(struct_obj.session_uuid.c_str(), "GetCertificatesList");
+    }
+}
+
+void MainWindow::doGetCertUserContainers(const QString &host, const QString &system_user)
+{
+    auto model_online_users = m_models[arcirk::server::server_objects::OnlineUsers];
+    bool is_online = false;
+    arcirk::client::session_info struct_obj;
+    for (auto i = 0; i < model_online_users->rowCount(QModelIndex()) ; ++i) {
+        auto object = model_online_users->get_object(model_online_users->index(i,0, QModelIndex()));
+        struct_obj = pre::json::from_json<arcirk::client::session_info>(object);
+        if(struct_obj.host_name == host.toStdString() && struct_obj.system_user == system_user.toStdString()){
+            is_online = true;
+            break;
+        }
+    }
+
+    if(!is_online)
+        QMessageBox::critical(this, "Ошибка", "Клиент не в сети!");
+    else{
+        if(struct_obj.session_uuid == m_client->currentSession().toString(QUuid::WithoutBraces).toStdString()){
+            auto table = current_user->getContainers();
+            auto ba = arcirk::string_to_byte_array(table.dump());
+            auto result = arcirk::client::cryptopro_data();
+            result.conts = ByteArray(ba.size());
+            std::copy(ba.begin(), ba.end(), result.conts.begin());
+            emit certUserContainers(result);
+        }else
+            m_client->command_to_client(struct_obj.session_uuid.c_str(), "GetContainersList");
+    }
+}
+
+void MainWindow::doSelectHosts()
+{
+    auto types = json::array({arcirk::enum_synonym(arcirk::server::device_types::devDesktop), arcirk::enum_synonym(arcirk::server::device_types::devServer)});
+    json query_param = {
+        {"table_name", arcirk::enum_synonym(tables::tbDevices)},
+        {"query_type", "select"},
+        {"values", json{"first", "address", "ref", "deviceType"}},
+        {"where_values", json{{"deviceType", types}}}
+    };
+    std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+    auto dev = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery), json{
+                                         {"query_param", base64_param}
+                                     });
+    emit selectHosts(dev);
+}
+
+void MainWindow::doSelectDatabaseUser()
+{
+    using namespace arcirk::server;
+
+    m_models[DatabaseUsers]->fetchRoot("Users");
+    auto dlg = DialogSelectInTree(m_models[DatabaseUsers], {"ref", "parent", "is_group", "deletion_mark"}, this);
+    dlg.setModal(true);
+    dlg.exec();
+    if(dlg.result() == QDialog::Accepted){
+        auto sel_object = dlg.selectedObject();
+        emit selectDatabaseUser(sel_object);
+    }
+}
+
+void MainWindow::onTreeFetch()
+{
+    ui->treeView->resizeColumnToContents(0);
+}
+
+void MainWindow::update_rdp_files(const nlohmann::json &items)
+{
+    QDir dir(cache_mstsc_directory());
+    QStringList lstFiles = dir.entryList(QDir::Files);
+    foreach (QString entry, lstFiles)
+    {
+        QString entryAbsPath = dir.absolutePath() + "/" + entry;
+        QFile::setPermissions(entryAbsPath, QFile::ReadOwner | QFile::WriteOwner);
+        QFile::remove(entryAbsPath);
+    }
+    if(items.is_array()){
+        for (auto it = items.begin(); it != items.end(); ++it) {
+            auto item = arcirk::secure_serialization<arcirk::client::mstsc_options>(*it);
+            if(item.uuid.empty()){
+                continue;
+            }else{
+                QString file_name = dir.path() + "/";
+                file_name.append(item.uuid.c_str());
+                file_name.append(".rdp");
+                QFile f(file_name);
+                if(f.open(QIODevice::WriteOnly)){
+                    int screenMode = 2;
+                    if(item.not_full_window){
+                        screenMode = 1;
+                    }
+                    QString rdp = rdp_file_text().arg(QString::number(screenMode), QString::number(item.width), QString::number(item.height), item.user_name.c_str(), item.address.c_str());
+                    f.write(rdp.toUtf8());
+                    f.close();
+                }
+            }
+        }
+
+    }
+
+}
 
 void MainWindow::on_mnuConnect_triggered()
 {
@@ -374,7 +597,140 @@ void MainWindow::resetModel(server::server_objects key, const nlohmann::json &da
 ////        m_models[key]->reset();
 //    }
 
-      ui->treeView->resizeColumnToContents(0);
+    ui->treeView->resizeColumnToContents(0);
+}
+
+void MainWindow::createTrayActions()
+{
+    qDebug() << __FUNCTION__;
+    quitAction = new QAction(tr("&Выйти"), this);
+    connect(quitAction, &QAction::triggered, this, &MainWindow::onAppExit);
+    showAction = new QAction(tr("&Открыть менеджер сервера"), this);
+    showAction->setIcon(QIcon(":/img/certificate.ico"));
+    connect(showAction, &QAction::triggered, this, &MainWindow::onWindowShow);
+
+    trayIconMenu = new QMenu(this);
+    trayIconMenu->addAction(showAction);
+    trayIconMenu->addSeparator();
+    trayIconMenu->addAction(quitAction);
+
+//    trayIcon = new QSystemTrayIcon(this);
+//    trayIcon->setContextMenu(trayIconMenu);
+
+//    QIcon icon = QIcon(":/img/certificate.ico");
+//    trayIcon->setIcon(icon);
+//    setWindowIcon(icon);
+
+//    trayIcon->setToolTip("Менеджер сервера");
+
+//    connect(trayIcon, &QSystemTrayIcon::messageClicked, this, &MainWindow::trayMessageClicked);
+//    connect(trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::trayIconActivated);
+
+//    trayIcon->show();
+
+    //createDynamicMenu();
+}
+
+void MainWindow::createTrayIcon()
+{
+    qDebug() << __FUNCTION__;
+    trayIcon = new QSystemTrayIcon(this);
+    trayIcon->setContextMenu(trayIconMenu);
+
+    QIcon icon = QIcon(":/img/certificate.ico");
+    trayIcon->setIcon(icon);
+    setWindowIcon(icon);
+
+    trayIcon->setToolTip("Менеджер сервера");
+
+    connect(trayIcon, &QSystemTrayIcon::messageClicked, this, &MainWindow::trayMessageClicked);
+    connect(trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::trayIconActivated);
+
+}
+
+void MainWindow::createDynamicMenu()
+{
+    qDebug() << __FUNCTION__;
+    trayIconMenu->clear();
+    trayIconMenu->addAction(showAction);
+
+    auto cache = current_user->cache();
+    auto mstsc_param = cache.value("mstsc_param", json::object());
+    auto mpl_ = arcirk::internal_structure<arcirk::client::mpl_options>("mpl_options", cache);
+    use_firefox = mpl_.use_firefox;
+    firefox_path = mpl_.firefox_path;
+
+    if(!mstsc_param.empty()){
+        auto is_enable = mstsc_param.value("enable_mstsc", false);
+        auto detailed_records = mstsc_param.value("detailed_records", json::array());
+        if(is_enable && detailed_records.size() > 0){
+            trayIconMenu->addSeparator();
+            for(auto itr = detailed_records.begin(); itr != detailed_records.end(); ++itr){
+                 auto object = *itr;
+                 auto mstsc = arcirk::secure_serialization<arcirk::client::mstsc_options>(object);
+                 QString name = mstsc.name.c_str();
+                 auto action = new QAction(name, this);
+                 action->setProperty("data", object.dump().c_str());
+                 action->setProperty("type", "mstsc");
+                 action->setIcon(QIcon(":/img/mstsc.png"));
+                 trayIconMenu->addAction(action);
+                 connect(action, &QAction::triggered, this, &MainWindow::onTrayTriggered);
+            }
+        }
+    }
+
+    if(mpl_.mpl_list.size() > 0){
+        auto table_str = arcirk::byte_array_to_string(mpl_.mpl_list);
+        auto table_j = json::parse(table_str);
+        if(table_j.is_object()){
+            auto mpl_list = table_j.value("rows", json::array());
+            trayIconMenu->addSeparator();
+            for (auto itr = mpl_list.begin(); itr != mpl_list.end(); ++itr) {
+                auto object = *itr;
+                auto mstsc = pre::json::from_json<arcirk::client::mpl_item>(object);
+                QString name = mstsc.name.c_str();
+                auto action = new QAction(name, this);
+                action->setProperty("data", object.dump().c_str());
+                action->setProperty("type", "link");
+                action->setIcon(get_link_icon(mstsc.url.c_str()));
+                trayIconMenu->addAction(action);
+                connect(action, &QAction::triggered, this, &MainWindow::onTrayTriggered);
+            }
+        }
+    }
+//    if(modelMstsc->rowCount() > 0){
+//        int iName = modelMstsc->getColumnIndex("name");
+//        int iServer = modelMstsc->getColumnIndex("ip_address");
+//        int iPort = modelMstsc->getColumnIndex("port");
+//        int iDefPort = modelMstsc->getColumnIndex("defPort");
+//        int iNotFillWindow = modelMstsc->getColumnIndex("notFillWindow");
+//        int iWidth = modelMstsc->getColumnIndex("width");
+//        int iHeight = modelMstsc->getColumnIndex("height");
+//        int iUser = modelMstsc->getColumnIndex("user");
+//        int iPassword = modelMstsc->getColumnIndex("password");
+//        int iUpdateUser = modelMstsc->getColumnIndex("updateUser");
+//        trayIconMenu->addSeparator();
+//        for(int i = 0; i < modelMstsc->rowCount(); ++i){
+//            QString name = modelMstsc->index(i, iName).data(Qt::UserRole + iName).toString();
+//            auto action = new QAction(name, this);
+//            action->setProperty("address",  modelMstsc->index(i, iServer).data(Qt::UserRole + iServer).toString());
+//            action->setProperty("port",  modelMstsc->index(i, iPort).data(Qt::UserRole + iPort).toInt());
+//            action->setProperty("defPort",  modelMstsc->index(i, iDefPort).data(Qt::UserRole + iDefPort).toBool());
+//            action->setProperty("notFillWindow",  modelMstsc->index(i, iNotFillWindow).data(Qt::UserRole + iNotFillWindow).toBool());
+//            action->setProperty("width",  modelMstsc->index(i, iWidth).data(Qt::UserRole + iWidth).toInt());
+//            action->setProperty("height",  modelMstsc->index(i, iHeight).data(Qt::UserRole + iHeight).toInt());
+//            action->setProperty("user",  modelMstsc->index(i, iUser).data(Qt::UserRole + iUser).toString());
+//            action->setProperty("password",  modelMstsc->index(i, iPassword).data(Qt::UserRole + iPassword).toString());
+//            action->setProperty("updateUser",  modelMstsc->index(i, iUpdateUser).data(Qt::UserRole + iUpdateUser).toBool());
+
+//            action->setIcon(QIcon(":/img/mstsc.png"));
+//            trayIconMenu->addAction(action);
+//            connect(action, &QAction::triggered, this, &MainWindow::onTrayTriggered);
+//        }
+
+//    }
+    trayIconMenu->addSeparator();
+    trayIconMenu->addAction(quitAction);
 }
 
 void MainWindow::fillDefaultTree()
@@ -474,6 +830,7 @@ void MainWindow::createModels()
         }else if(itr == CertUsers){
             model->use_hierarchy("first");
         }
+        connect(model, &TreeViewModel::fetch, this, &MainWindow::onTreeFetch);
         m_models.insert(itr, model);
     }
 }
@@ -544,6 +901,8 @@ void MainWindow::createColumnAliases()
     m_colAliases.insert("not_valid_before", "Начало действия");
     m_colAliases.insert("not_valid_after", "Окончание дейтствия");
     m_colAliases.insert("type", "Тип");
+    m_colAliases.insert("host", "Хост");
+    m_colAliases.insert("system_user", "Пользователь ОС");
 }
 
 void MainWindow::on_treeWidget_itemClicked(QTreeWidgetItem *item, int column)
@@ -894,34 +1253,34 @@ void MainWindow::edit_cert_user(const QModelIndex &index)
 
 
     auto object = model->get_object(index);
-    auto query = builder::query_builder();
+//    auto query = builder::query_builder();
 
-    std::string query_text = query.select().from("CertUsers").where(nlohmann::json{
-                                                                       {"ref", object["ref"].get<std::string>()}
-                                                                   }, true).prepare();
+//    std::string query_text = query.select().from("CertUsers").where(nlohmann::json{
+//                                                                       {"ref", object["ref"].get<std::string>()}
+//                                                                   }, true).prepare();
 
-    auto param = nlohmann::json::object();
-    param["query_text"] = query_text;
-    auto command = arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery);
-    auto result = m_client->exec_http_query(command, param);
+//    auto param = nlohmann::json::object();
+//    param["query_text"] = query_text;
+//    auto command = arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery);
+//    auto result = m_client->exec_http_query(command, param);
 
-    if(!result.is_object()){
-        QMessageBox::critical(this, "Ошибка", "Ошибка на свервере!");
-        return;
-    }
+//    if(!result.is_object()){
+//        QMessageBox::critical(this, "Ошибка", "Ошибка на свервере!");
+//        return;
+//    }
 
-    auto rows = result["rows"];
-    if(!rows.is_array()){
-        QMessageBox::critical(this, "Ошибка", "Ошибка на свервере!");
-        return;
-    }
+//    auto rows = result["rows"];
+//    if(!rows.is_array()){
+//        QMessageBox::critical(this, "Ошибка", "Ошибка на свервере!");
+//        return;
+//    }
 
-    if(rows.size() == 0){
-        QMessageBox::critical(this, "Ошибка", "Запись не найдена!");
-        return;
-    }
+//    if(rows.size() == 0){
+//        QMessageBox::critical(this, "Ошибка", "Запись не найдена!");
+//        return;
+//    }
 
-    auto struct_users = pre::json::from_json<arcirk::database::cert_users>(rows[0]);
+    auto struct_users = pre::json::from_json<arcirk::database::cert_users>(object);
     auto parent = index.parent();
     QString parentName;
     if(parent.isValid()){
@@ -941,13 +1300,29 @@ void MainWindow::edit_cert_user(const QModelIndex &index)
                                      });
     auto devices = dev.value("rows", json::array());
 
-    auto dlg = DialogEditCertUser(struct_users, parentName, devices, this);
+    m_models[DatabaseUsers]->fetchRoot("Users");
+    auto dlg = DialogEditCertUser(struct_users, parentName, m_models[arcirk::server::server_objects::DatabaseUsers], devices, this);
+    if(!struct_users.uuid.empty()){
+        json query_param = {
+            {"table_name", arcirk::enum_synonym(tables::tbUsers)},
+            {"query_type", "select"},
+            {"values", json{"first"}},
+            {"where_values", json{{"ref", struct_users.uuid}}}
+        };
+        std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+        auto us = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery), json{
+                                             {"query_param", base64_param}
+                                         });
+        auto arr = us.value("rows", json::array());
+        if(arr.size() > 0){
+            std::string us_name = arr[0].value("first", "");
+            dlg.set_1c_parent(us_name.c_str());
+        }
+    }
     dlg.setModal(true);
     dlg.exec();
 
     if(dlg.result() == QDialog::Accepted){
-//        struct_users.first = object["first"];
-//        struct_users.second = object["second"];
         nlohmann::json query_param = {
             {"table_name", arcirk::enum_synonym(tables::tbCertUsers)},
             {"query_type", "update"},
@@ -1001,6 +1376,9 @@ void MainWindow::on_btnEdit_clicked()
     auto model = (TreeViewModel*)ui->treeView->model();
     if(model->server_object() == arcirk::server::CertUsers){
         edit_cert_user(index);
+    }else if(model->server_object() == arcirk::server::Devices
+             || model->server_object() == arcirk::server::OnlineUsers){
+        emit ui->treeView->doubleClicked(index);
     }
 
 }
@@ -1119,6 +1497,7 @@ void MainWindow::on_treeView_doubleClicked(const QModelIndex &index)
                             update_icons(server_objects::Devices, model);
                         }
                     }
+                    update_icons(arcirk::server::Devices, model);
                 }
             }
         }else if(model->server_object() == arcirk::server::Services){
@@ -1134,40 +1513,14 @@ void MainWindow::on_treeView_doubleClicked(const QModelIndex &index)
                 m_client->send_command(server_commands::UpdateTaskOptions, param);
             }
         }else if(model->server_object() == arcirk::server::CertUsers){
-            auto is_group = model->data(model->index(index.row(), model->get_column_index("is_group"), index.parent()), Qt::DisplayRole).toInt();
-            if(is_group == 1)
-                return;
-            auto obj = model->get_object(index);
-            auto struct_user = pre::json::from_json<arcirk::database::cert_users>(obj);
-            m_models[DatabaseUsers]->fetchRoot("Users");
+            edit_cert_user(index);
+        }else if(model->server_object() == arcirk::server::OnlineUsers){
 
-            auto types = json::array({enum_synonym(device_types::devDesktop), enum_synonym(device_types::devServer)});
-            json query_param = {
-                {"table_name", arcirk::enum_synonym(tables::tbDevices)},
-                {"query_type", "select"},
-                {"values", json{"first", "ref"}},
-                {"where_values", json{{"deviceType", types}}}
-            };
-            std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
-            auto dev = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery), json{
-                                                 {"query_param", base64_param}
-                                             });
-            auto rows = dev.value("rows", json::array());
-            auto dlg = DialogCertUserCache(struct_user, m_models[server_objects::DatabaseUsers], rows, m_client->conf().server_host.c_str(), this);
+            auto object = model->get_object(index);
+            auto dlg = DialogInfo(object, object["app_name"].get<std::string>().c_str(), this);
             dlg.setModal(true);
             dlg.exec();
-            if(dlg.result() == QDialog::Accepted){
-                auto query_param = nlohmann::json{
-                    {"table_name", enum_synonym(tables::tbCertUsers)},
-                    {"where_values", nlohmann::json{{"ref", struct_user.ref}}},
-                    {"values", pre::json::to_json(struct_user)},
-                    {"query_type", "update"}
-                };
 
-                m_client->send_command(arcirk::server::server_commands::ExecuteSqlQuery, nlohmann::json{
-                                           {"query_param", QByteArray(query_param.dump().data()).toBase64().toStdString()}
-                                       });
-            }
         }
     } catch (const std::exception& e) {
         qCritical() << __FUNCTION__ << e.what();
@@ -1427,12 +1780,12 @@ void MainWindow::on_btnAdd_clicked()
 
     }else if(model->server_object() == arcirk::server::CertUsers){
         auto index = ui->treeView->currentIndex();
-        QModelIndex current_parent{};
-        //auto user_struct = arcirk::database::table_default_struct<arcirk::database::cert_users>(arcirk::database::tbCertUsers);
+        //QModelIndex current_parent{};
+
         if(index.isValid()){
 
             auto parent_object = model->get_object(index);
-            current_parent = index;
+            //current_parent = index;
 
             if(parent_object["is_group"] == 0){
                 auto parent = index.parent();                
@@ -1442,57 +1795,11 @@ void MainWindow::on_btnAdd_clicked()
                     return;
                 }
                 parent_object = model->get_object(parent);
-                current_parent = parent;
+                //current_parent = parent;
             }
 
-            std::string parent_name = parent_object["first"];
-
-            auto object = arcirk::database::table_default_json(arcirk::database::tables::tbCertUsers);
-            object["parent"] = parent_object["ref"];
-            object["ref"] = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
-            object["is_group"] = 0;
-            m_models[DatabaseUsers]->fetchRoot("Users");
-
-            auto types = json::array({enum_synonym(device_types::devDesktop), enum_synonym(device_types::devServer)});
-            json query_param = {
-                {"table_name", arcirk::enum_synonym(tables::tbDevices)},
-                {"query_type", "select"},
-                {"values", json{"first", "ref"}},
-                {"where_values", json{{"deviceType", types}}}
-            };
-            std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
-            auto dev = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery), json{
-                                                 {"query_param", base64_param}
-                                             });
-            auto devices = dev.value("rows", json::array());
-
-            auto struct_users = pre::json::from_json<arcirk::database::cert_users>(object);
-            auto dlg = DialogEditCertUser(struct_users, parent_name.c_str(), m_models[arcirk::server::server_objects::DatabaseUsers], devices, this);
-            dlg.setModal(true);
-            dlg.exec();
-            if(dlg.result() == QDialog::Accepted){
-                nlohmann::json query_param = {
-                    {"table_name", "CertUsers"},
-                    {"query_type", "insert"},
-                    {"values", pre::json::to_json(struct_users)},
-                    {"where_values", {}}
-                };
-
-                std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
-                auto resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::ExecuteSqlQuery), json{
-                                                     {"query_param", base64_param}
-                                                 });
-//                if(resp.is_string()){
-//                   if(resp.get<std::string>() == "success"){
-//                        model->add(struct_users, current_parent);
-//                        if(!current_parent.isValid() && model->rowCount(current_parent)){
-//                            model->fetchRoot(enum_synonym(tables::tbCertUsers).c_str());
-//                            model->reset();
-//                        }else
-//                            model->add(struct_users, current_parent);
-//                    }
-//                }
-            }
+            auto parent_struct = pre::json::from_json<arcirk::database::cert_users>(parent_object);
+            add_cert_user(parent_struct);
         }else
             QMessageBox::critical(this, "Ошибка", "Выберете группу!");
     }
@@ -1562,7 +1869,7 @@ void MainWindow::on_btnDelete_clicked()
             std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
             auto resp = m_client->exec_http_query(command, query_param);
             model->remove(index);
-
+            update_icons(arcirk::server::Devices, model);
         }
     }else if(model->server_object() == server_objects::Certificates){
         int ind = model->get_column_index("first");
@@ -1861,7 +2168,8 @@ void MainWindow::on_btnSendClientRelease_clicked()
             int count = 0;
             QString result;
             while (exists) {
-                auto suffix = std::format("{:03}", count);
+                //auto suffix = std::format("{:03}", count);
+                std::string suffix = fmt::format("{:03}", count);
                 if(count >= max)
                     break;
                 QDir dir(destantion + "/" + def_folder + "." + suffix.c_str());
@@ -1948,34 +2256,56 @@ void MainWindow::on_btnAddGroup_clicked()
     auto index = ui->treeView->currentIndex();
 
     if(model->server_object() == arcirk::server::CertUsers){
-        auto st = arcirk::database::table_default_json(arcirk::database::tables::tbCertUsers);
-        st["is_group"] = 1;
+        auto struct_users = arcirk::database::table_default_struct<database::cert_users>(arcirk::database::tables::tbCertUsers);
+        struct_users.is_group = 1;
 
         QString parent_name;
         QString parent_uuid = NIL_STRING_UUID;
         QModelIndex parent;
+
         int is_group = 0;
+
         if(index.isValid()){
-            parent = index.parent();
-            auto ind_is_group = model->get_column_index("is_group");
-            auto ind_first = model->get_column_index("first");
-            auto ind_ref = model->get_column_index("ref");
-            is_group = model->index(index.row(), ind_is_group, index.parent()).data(Qt::DisplayRole).toInt();
-            if(is_group == 1){
-                parent_name = model->index(index.row(), ind_first, index.parent()).data(Qt::DisplayRole).toString();
-                parent_uuid = model->index(index.row(), ind_ref, index.parent()).data(Qt::DisplayRole).toString();
-            }else{
-
+            auto object = model->get_object(index);
+            is_group = object["is_group"];
+            if(is_group == 0){
+                parent = index.parent();
                 if(parent.isValid()){
-                    parent_name = model->index(parent.row(), ind_first, parent.parent()).data(Qt::DisplayRole).toString();
-                    parent_uuid = model->index(parent.row(), ind_ref, parent.parent()).data(Qt::DisplayRole).toString();
-                }
+                    auto object_parent = model->get_object(parent);
+                    parent_name = QString::fromStdString(object_parent["first"].get<std::string>());
+                    parent_uuid = QString::fromStdString(object_parent["ref"].get<std::string>());
+                }else
+                    parent = QModelIndex();
+            }else{
+                parent = index;
+                parent_name = QString::fromStdString(object["first"].get<std::string>());
+                parent_uuid = QString::fromStdString(object["ref"].get<std::string>());
             }
-        }else
-            parent = QModelIndex();
+        }
 
-        st["parent"] = parent_uuid.toStdString();
-        auto struct_users = pre::json::from_json<arcirk::database::cert_users>(st);
+
+
+//        if(index.isValid()){
+//            parent = index.parent();
+//            auto ind_is_group = model->get_column_index("is_group");
+//            auto ind_first = model->get_column_index("first");
+//            auto ind_ref = model->get_column_index("ref");
+//            is_group = model->index(index.row(), ind_is_group, index.parent()).data(Qt::DisplayRole).toInt();
+//            if(is_group == 1){
+//                parent_name = model->index(index.row(), ind_first, index.parent()).data(Qt::DisplayRole).toString();
+//                parent_uuid = model->index(index.row(), ind_ref, index.parent()).data(Qt::DisplayRole).toString();
+//            }else{
+
+//                if(parent.isValid()){
+//                    parent_name = model->index(parent.row(), ind_first, parent.parent()).data(Qt::DisplayRole).toString();
+//                    parent_uuid = model->index(parent.row(), ind_ref, parent.parent()).data(Qt::DisplayRole).toString();
+//                }
+//            }
+//        }else
+//            parent = QModelIndex();
+
+        struct_users.parent = parent_uuid.toStdString();
+
         auto dlg = DialogEditCertUser(struct_users, parent_name, json::array(), this);
         dlg.setModal(true);
         dlg.exec();
@@ -1990,14 +2320,13 @@ void MainWindow::on_btnAddGroup_clicked()
             auto resp = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery), json{
                                                  {"query_param", base64_param}
                                              });
+
             std::string result = "success";
             if(resp.is_string())
                 result = resp.get<std::string>();
             if(resp != "error"){
-                if(is_group == 0)
-                    model->add(st, index.parent());
-                else
-                    model->add(st, index);
+                auto obj = pre::json::to_json(struct_users);
+                model->add(obj, parent);
             }
         }
     }
@@ -2055,3 +2384,475 @@ void MainWindow::on_btnRegistryDevice_clicked()
     }
 }
 
+//void MainWindow::onShowMenu()
+//{
+//    qDebug() << __FUNCTION__;
+//}
+
+
+void MainWindow::onTrayTriggered()
+{
+    qDebug() << __FUNCTION__;
+
+    auto *action = dynamic_cast<QAction*>( sender() );
+    QString type_action = action->property("type").toString();
+
+    if(type_action == "mstsc"){
+        auto dt = action->property("data").toString().toStdString();
+        auto item = pre::json::from_json<arcirk::client::mstsc_options>(json::parse(dt));
+        run_mstsc_link(item);
+    }else if(type_action == "link"){
+
+    }
+
+//    QString address = action->property("address").toString();
+//    QString user = action->property("user").toString();
+//    QString _pwd = action->property("password").toString();
+//    QString name = action->text();// action->property("name").toString();
+    //bool updateUser = action->property("updateUser").toBool();
+
+//    if(!address.isEmpty()){
+//        if(!updateUser){
+//    //        QString cmd = QString("mstsc /v:%1").arg(address);
+//            if(!action->property("defPort").toBool()){
+//                address.append(":" + QString::number(action->property("port").toInt()));
+//            }
+//            QString pwd;
+//            if(!_pwd.isEmpty())
+//                pwd = Crypter::decrypt(_pwd, "my_key");
+//            terminal->setCurrentMstsc(name);
+//            terminal->send(QString("cmdkey /add:%1 /user:%2 /pass:%3").arg("TERMSRV/" + address, user, pwd), mstscAddUserToConnect);
+//        }else{
+//            terminal->setCurrentMstsc(name);
+//            onParseCommand("", CmdCommand::mstscAddUserToConnect);
+//        }
+//    }
+}
+
+void MainWindow::onAppExit()
+{
+    qDebug() << __FUNCTION__;
+
+//    if(terminal)
+//        terminal->stop();
+//    if(m_client)
+//        if(m_client->isStarted())
+//            m_client->close(true);
+//    if(db)
+//        if(db->isOpen())
+//            db->close();
+
+    QApplication::exit();
+}
+
+void MainWindow::onWindowShow()
+{
+    qDebug() << __FUNCTION__;
+
+    setVisible(true);
+}
+
+void MainWindow::trayMessageClicked()
+{
+//    QMessageBox::information(nullptr, tr("Systray"),
+//                             tr("Sorry, I already gave what help I could.\n"
+//                                "Maybe you should try asking a human?"));
+}
+
+void MainWindow::trayIconActivated(QSystemTrayIcon::ActivationReason reason)
+{
+    qDebug() << __FUNCTION__ << reason;
+//    switch (reason) {
+//    case QSystemTrayIcon::Trigger:
+//    case QSystemTrayIcon::DoubleClick:
+//        //iconComboBox->setCurrentIndex((iconComboBox->currentIndex() + 1) % iconComboBox->count());
+//        setVisible(true);
+//        break;
+//    case QSystemTrayIcon::MiddleClick:
+//        trayShowMessage();
+//        break;
+//    default:
+//
+//    ;
+//    }
+
+    if(reason == QSystemTrayIcon::DoubleClick){
+        setVisible(true);
+    }else if(reason == QSystemTrayIcon::Context){
+        qDebug() << "QSystemTrayIcon::Context";
+    }
+
+}
+
+void MainWindow::trayShowMessage(const QString& msg, int isError)
+{
+    if(!isError)
+        trayIcon->showMessage("Менеджер сертификатов", msg);
+    else{
+
+    }
+
+}
+
+void MainWindow::setVisible(bool visible)
+{
+    QMainWindow::setVisible(visible);
+}
+
+QIcon MainWindow::get_link_icon(const QString &link)
+{
+    if(link.indexOf("markirovka") != -1){
+        return QIcon(":/img/markirowka.png");
+    }else if(link.indexOf("diadoc.kontur.ru") != -1){
+        return QIcon(":/img/diadoc.png");
+    }else if(link.indexOf("ofd.kontur.ru") != -1){
+        return QIcon(":/img/ofd.png");
+    }else if(link.indexOf("extern.kontur.ru") != -1){
+        return QIcon(":/img/extern.png");
+    }else if(link.indexOf("sberbank.ru") != -1){
+        return QIcon(":/img/sberbank.png");
+    }else
+        return QIcon(":/img/link.png");
+}
+
+void MainWindow::run_mstsc_link(const arcirk::client::mstsc_options &opt)
+{
+
+    QString command;
+
+    QString address = QString(opt.address.c_str()) + ":" + QString::number(opt.port);
+//    if(!opt.def_port){
+//        address.append(":" + QString::number(opt.port));
+//    }
+    QString pwd;
+    if(!opt.password.empty())
+        pwd = WebSocketClient::crypt(opt.password.c_str(), CRYPT_KEY).c_str();
+
+    if(opt.reset_user){
+        command = QString("cmdkey /add:%1 /user:%2 /pass:%3 & ").arg("TERMSRV/" + address, opt.user_name.c_str(), pwd);
+    }
+
+    QFile f(cache_mstsc_directory() + "/" + opt.uuid.c_str() + ".rdp");
+
+    command.append("mstsc \"" + QDir::toNativeSeparators(f.fileName()) + "\" & exit");
+
+    using json = nlohmann::json;
+
+    auto cmd = CommandLine(this);
+    QEventLoop loop;
+
+    auto started = [&cmd, &command]() -> void
+    {
+        cmd.send(command, CmdCommand::csptestContainerFnfo);
+    };
+    loop.connect(&cmd, &CommandLine::started_process, started);
+
+    //json result{};
+    //QByteArray cmd_text;
+    auto output = [](const QByteArray& data) -> void
+    {
+        //cmd_text.append(data);
+        std::string result_ = arcirk::to_utf(data.toStdString(), "cp866");
+        qDebug() << qPrintable(result_.c_str());
+    };
+    loop.connect(&cmd, &CommandLine::output, output);
+
+    auto err = [&loop, &cmd](const QString& data, int command) -> void
+    {
+        qDebug() << __FUNCTION__ << data << command;
+        cmd.stop();
+        loop.quit();
+    };
+    loop.connect(&cmd, &CommandLine::error, err);
+
+    auto state = [&loop]() -> void
+    {
+        loop.quit();
+    };
+    loop.connect(&cmd, &CommandLine::complete, state);
+
+    cmd.start();
+    loop.exec();
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+#ifdef Q_OS_MACOS
+    if (!event->spontaneous() || !isVisible()) {
+        return;
+    }
+#endif
+
+    if (trayIcon->isVisible()) {
+        hide();
+        event->ignore();
+    }
+}
+
+void MainWindow::on_btnRegistryUser_clicked()
+{
+    auto index = ui->treeView->currentIndex();
+    if(!index.isValid()){
+        QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
+        return;
+    }
+    auto model = (TreeViewModel*)ui->treeView->model();
+
+    if(model->server_object() == arcirk::server::OnlineUsers){
+        auto object = pre::json::from_json<arcirk::client::session_info>(model->get_object(index));
+        if(QMessageBox::question(this, "Регистрация пользователя", QString("Зарегистировать пользователя '%1'?").arg(object.system_user.c_str())) == QMessageBox::No)
+            return;
+
+        auto m_tree = new TreeViewModel(m_client->conf(), this);
+        m_tree->set_group_only(true);
+        m_tree->use_hierarchy("first");
+        m_tree->set_column_aliases(m_colAliases);
+        m_tree->fetchRoot(arcirk::enum_synonym(arcirk::database::tables::tbCertUsers).c_str());
+
+        auto dlg_sel_group = DialogSelectInTree(m_tree, this);
+        dlg_sel_group.allow_sel_group(true);
+        dlg_sel_group.set_window_text("Выбор группы");
+        dlg_sel_group.setModal(true);
+        dlg_sel_group.exec();
+
+        if(dlg_sel_group.result() == QDialog::Accepted){
+            auto group = dlg_sel_group.selectedObject();
+            auto parent_struct = pre::json::from_json<arcirk::database::cert_users>(group);
+            add_cert_user(parent_struct, object.host_name.c_str(), object.user_name.c_str(), object.user_uuid.c_str(), object.system_user.c_str());
+        }
+        delete m_tree;
+    }
+}
+
+void MainWindow::add_cert_user(const arcirk::database::cert_users &parent, const QString& host, const QString& name, const QString& uuid, const QString& system_user)
+{
+    using namespace arcirk::server;
+    using json = nlohmann::json;
+
+    auto struct_users = arcirk::database::table_default_struct<arcirk::database::cert_users>(arcirk::database::tables::tbCertUsers);
+    struct_users.parent = parent.ref;
+    struct_users.is_group = 0;
+    struct_users.host = host.toStdString();
+    struct_users.first = name.toStdString();
+    struct_users.second = name.toStdString();
+    struct_users.uuid = uuid.toStdString();
+    struct_users.system_user = system_user.toStdString();
+
+    m_models[DatabaseUsers]->fetchRoot("Users");
+
+    auto types = json::array({enum_synonym(device_types::devDesktop), enum_synonym(device_types::devServer)});
+    json query_param = {
+        {"table_name", arcirk::enum_synonym(tables::tbDevices)},
+        {"query_type", "select"},
+        {"values", json{"first", "ref"}},
+        {"where_values", json{{"deviceType", types}}}
+    };
+    std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+    auto dev = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery), json{
+                                         {"query_param", base64_param}
+                                     });
+    auto devices = dev.value("rows", json::array());
+
+    auto dlg = DialogEditCertUser(struct_users, parent.first.c_str(), m_models[arcirk::server::server_objects::DatabaseUsers], devices, this);
+    dlg.setModal(true);
+
+    if(!uuid.isEmpty()){
+        json query_param = {
+            {"table_name", arcirk::enum_synonym(tables::tbUsers)},
+            {"query_type", "select"},
+            {"values", json{"first"}},
+            {"where_values", json{{"ref", uuid.toStdString()}}}
+        };
+        std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+        auto us = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery), json{
+                                             {"query_param", base64_param}
+                                         });
+        auto arr = us.value("rows", json::array());
+        if(arr.size() > 0){
+            std::string us_name = arr[0].value("first", "");
+            dlg.set_1c_parent(us_name.c_str());
+        }
+    }
+
+    dlg.exec();
+    if(dlg.result() == QDialog::Accepted){
+
+        if(is_cert_user_exists(struct_users.host.c_str(), struct_users.system_user.c_str())){
+            displayError("Ошибка", QString("Ползователь на %1\\%2 уже зарегистрирован!").arg(struct_users.host.c_str(), struct_users.system_user.c_str()));
+            return;
+        }
+        json query_param = {
+            {"table_name", "CertUsers"},
+            {"query_type", "insert"},
+            {"values", pre::json::to_json(struct_users)},
+            {"where_values", {}}
+        };
+
+        std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+        auto resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::ExecuteSqlQuery), json{
+                                             {"query_param", base64_param}
+                                         });
+
+    }
+}
+
+bool MainWindow::is_cert_user_exists(const QString &host, const QString &system_user)
+{
+    using namespace arcirk::server;
+    using json = nlohmann::json;
+
+    json query_param = {
+        {"table_name", arcirk::enum_synonym(tables::tbCertUsers)},
+        {"query_type", "select"},
+        {"values", json{"first"}},
+        {"where_values", json{
+                {"host", host.toStdString()},
+                {"system_user", system_user.toStdString()}
+            }
+        }
+    };
+    std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+    auto us = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery), json{
+                                         {"query_param", base64_param}
+                                     });
+    auto arr = us.value("rows", json::array());
+    return arr.size() > 0;
+}
+
+void MainWindow::on_btnEditCache_clicked()
+{
+    auto index = ui->treeView->currentIndex();
+    if(!index.isValid()){
+        QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
+        return;
+    }
+
+    auto model = (TreeViewModel*)ui->treeView->model();
+    using namespace arcirk::database;
+    using json = nlohmann::json;
+    using namespace arcirk::server;
+
+    if(model->server_object() == arcirk::server::CertUsers){
+        auto is_group = model->data(model->index(index.row(), model->get_column_index("is_group"), index.parent()), Qt::DisplayRole).toInt();
+        if(is_group == 1)
+            return;
+        auto obj = model->get_object(index);
+        auto struct_user = pre::json::from_json<arcirk::database::cert_users>(obj);
+        m_models[DatabaseUsers]->fetchRoot("Users");
+
+        auto types = json::array({enum_synonym(device_types::devDesktop), enum_synonym(device_types::devServer)});
+        json query_param = {
+            {"table_name", arcirk::enum_synonym(tables::tbDevices)},
+            {"query_type", "select"},
+            {"values", json{"first", "ref"}},
+            {"where_values", json{{"deviceType", types}}}
+        };
+        std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+        auto dev = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery), json{
+                                             {"query_param", base64_param}
+                                         });
+        auto rows = dev.value("rows", json::array());
+        auto dlg = DialogCertUserCache(struct_user, m_models[server_objects::DatabaseUsers], m_client->conf().server_host.c_str(), this);
+
+        connect(&dlg, &DialogCertUserCache::getData, this, &MainWindow::onCertUserCache);
+        connect(this, &MainWindow::certUserData, &dlg, &DialogCertUserCache::onCertUserCache);
+        connect(this, &MainWindow::mozillaProfiles, &dlg, &DialogCertUserCache::doMozillaProfiles);
+        connect(&dlg, &DialogCertUserCache::getMozillaProfiles, this, &MainWindow::onMozillaProfiles);
+        connect(&dlg, &DialogCertUserCache::getCertificates, this, &MainWindow::doGetCertUserCertificates);
+        connect(this, &MainWindow::certUserCertificates, &dlg, &DialogCertUserCache::onCertificates);
+        connect(&dlg, &DialogCertUserCache::selectHosts, this, &MainWindow::doSelectHosts);
+        connect(this, &MainWindow::selectHosts, &dlg, &DialogCertUserCache::onSelectHosts);
+        connect(&dlg, &DialogCertUserCache::selectDatabaseUser, this, &MainWindow::doSelectDatabaseUser);
+        connect(this, &MainWindow::selectDatabaseUser, &dlg, &DialogCertUserCache::onSelectDatabaseUser);
+        connect(&dlg, &DialogCertUserCache::getContainers, this, &MainWindow::doGetCertUserContainers);
+        connect(this, &MainWindow::certUserContainers, &dlg, &DialogCertUserCache::onContainers);
+
+        dlg.setModal(true);
+        dlg.exec();
+        if(dlg.result() == QDialog::Accepted){
+            auto query_param = nlohmann::json{
+                {"table_name", enum_synonym(tables::tbCertUsers)},
+                {"where_values", nlohmann::json{{"ref", struct_user.ref}}},
+                {"values", pre::json::to_json(struct_user)},
+                {"query_type", "update"}
+            };
+
+            m_client->send_command(arcirk::server::server_commands::ExecuteSqlQuery, nlohmann::json{
+                                       {"query_param", QByteArray(query_param.dump().data()).toBase64().toStdString()}
+                                   });
+            model->set_object(index, pre::json::to_json(struct_user));
+            if(struct_user.system_user == current_user->user_name().toStdString() &&
+                    struct_user.host == current_user->host().toStdString()){
+                current_user->set_database_cache(struct_user.cache);
+                auto cache = current_user->cache();
+                auto mstsc_param = cache.value("mstsc_param", json::object());
+                auto detailed_records = mstsc_param.value("detailed_records", json::array());
+                update_rdp_files(detailed_records);
+                createDynamicMenu();
+            }
+        }
+    }
+}
+
+QString MainWindow::rdp_file_text()
+{
+    QString text = "screen mode id:i:%1\n"
+            "use multimon:i:0\n"
+            "desktopwidth:i:%2\n"
+            "desktopheight:i:%3\n"
+            "session bpp:i:32\n"
+            "winposstr:s:0,3,0,0,%2,%3\n"
+            "compression:i:1\n"
+            "keyboardhook:i:2\n"
+            "audiocapturemode:i:0\n"
+            "videoplaybackmode:i:1\n"
+            "connection type:i:7\n"
+            "networkautodetect:i:1\n"
+            "bandwidthautodetect:i:1\n"
+            "displayconnectionbar:i:1\n"
+            "username:s:%4\n"
+            "enableworkspacereconnect:i:0\n"
+            "disable wallpaper:i:0\n"
+            "allow font smoothing:i:0\n"
+            "allow desktop composition:i:0\n"
+            "disable full window drag:i:1\n"
+            "disable menu anims:i:1\n"
+            "disable themes:i:0\n"
+            "disable cursor setting:i:0\n"
+            "bitmapcachepersistenable:i:1\n"
+            "full address:s:%5\n"
+            "audiomode:i:0\n"
+            "redirectprinters:i:1\n"
+            "redirectcomports:i:0\n"
+            "redirectsmartcards:i:1\n"
+            "redirectclipboard:i:1\n"
+            "redirectposdevices:i:0\n"
+            "autoreconnection enabled:i:1\n"
+            "authentication level:i:2\n"
+            "prompt for credentials:i:0\n"
+            "negotiate security layer:i:1\n"
+            "remoteapplicationmode:i:0\n"
+            "alternate shell:s:\n"
+            "shell working directory:s:\n"
+            "gatewayhostname:s:\n"
+            "gatewayusagemethod:i:4\n"
+            "gatewaycredentialssource:i:4\n"
+            "gatewayprofileusagemethod:i:0\n"
+            "promptcredentialonce:i:0\n"
+            "gatewaybrokeringtype:i:0\n"
+            "use redirection server name:i:0\n"
+            "rdgiskdcproxy:i:0\n"
+            "kdcproxyname:s:";
+
+    return text;
+}
+
+QString MainWindow::cache_mstsc_directory()
+{
+    auto app_data = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    app_data.append("/mstsc");
+    QDir f(app_data);
+    if(!f.exists())
+        f.mkpath(f.path());
+    return f.path();
+}

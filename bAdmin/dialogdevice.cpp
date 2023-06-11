@@ -77,7 +77,7 @@ void DialogDevice::accept()
     result_.workplace= tables_v[tables::tbWorkplaces][ui->cmbWorkplaces->currentText().toStdString()];
     result_.first = ui->edtFirst->text().toStdString();
     result_.second = ui->edtSecond->text().toStdString();
-    result_.second = ui->txtAddress->text().toStdString();
+    result_.address = ui->txtAddress->text().toStdString();
 
     view_result_.ref = result_.ref;
     view_result_.first = result_.first;
