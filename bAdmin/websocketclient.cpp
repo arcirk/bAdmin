@@ -365,10 +365,16 @@ nlohmann::json WebSocketClient::exec_http_query(const std::string &command, cons
         return {};
 
     try {
-        auto http_result = nlohmann::json::parse(QByteArray::fromBase64(msg.result.data()).toStdString());
-        return http_result;
-    } catch (...) {
-        return msg.result;
+        if(msg.result != "error"){
+            auto http_result = nlohmann::json::parse(QByteArray::fromBase64(msg.result.data()).toStdString());
+            return http_result;
+        }else{
+            emit error(__FUNCTION__, msg.command.c_str(), msg.message.c_str());
+            return "error";
+        }
+    } catch (const std::exception& e) {
+        emit error(__FUNCTION__, msg.command.c_str(), e.what());
+        return "error";
     }
 
 }

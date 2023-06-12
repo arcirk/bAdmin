@@ -104,6 +104,7 @@ private:
 
 signals:
     void displayError(const QString& what, const QString& err);
+    void error(const QString& what, const QString& command, const QString& err);
     void connectionSuccess(); //при успешной авторизации
     void connectionChanged(bool state);
     void serverResponse(const arcirk::server::server_response& message);

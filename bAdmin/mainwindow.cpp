@@ -2370,6 +2370,18 @@ void MainWindow::on_btnRegistryDevice_clicked()
             {"values", pre::json::to_json(dev)}
         };
         std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+        QString error_message;
+        auto error = [&error_message](const QString& what, const QString& command, const QString& err) -> void
+        {
+            qCritical() << QDateTime::currentDateTime().toString("hh:mm:ss") << what << command << err;
+
+            if(err.indexOf("UNIQUE constraint failed: Devices.ref") != -1){
+                error_message = "Устройство уже зарегистрировано!";
+            }else
+                error_message = "Ошибка регистрации!";
+
+        };
+        auto c_err = connect(m_client, &WebSocketClient::error, error);
         auto resp = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery), json{
                                              {"query_param", base64_param}
                                          });
@@ -2378,17 +2390,23 @@ void MainWindow::on_btnRegistryDevice_clicked()
         if(resp.is_string())
             result = resp.get<std::string>();
 
-        if(result == "success")
-            QMessageBox::information(this, "Регистрация устройства", "Устройство успешно зарегистрировано!");
+//        if(result == "success")
+//            QMessageBox::information(this, "Регистрация устройства", "Устройство успешно зарегистрировано!");
+//        else{
+//            if(!error_message.isEmpty())
+//                QMessageBox::information(this, "Регистрация устройства", error_message);
+//        }
+        if(result == "success"){
+            trayShowMessage("Устройство успешно зарегистрировано!");
+        }else{
+            if(!error_message.isEmpty()){
+                displayError("Регистрация устройства", error_message);
+            }
+        }
+        disconnect(c_err);
 
     }
 }
-
-//void MainWindow::onShowMenu()
-//{
-//    qDebug() << __FUNCTION__;
-//}
-
 
 void MainWindow::onTrayTriggered()
 {
@@ -2489,7 +2507,7 @@ void MainWindow::trayShowMessage(const QString& msg, int isError)
     if(!isError)
         trayIcon->showMessage("Менеджер сертификатов", msg);
     else{
-
+        displayError("Ошибка", msg);
     }
 
 }
@@ -2678,7 +2696,7 @@ void MainWindow::add_cert_user(const arcirk::database::cert_users &parent, const
     if(dlg.result() == QDialog::Accepted){
 
         if(is_cert_user_exists(struct_users.host.c_str(), struct_users.system_user.c_str())){
-            displayError("Ошибка", QString("Ползователь на %1\\%2 уже зарегистрирован!").arg(struct_users.host.c_str(), struct_users.system_user.c_str()));
+            displayError("Ошибка", QString("Пользователь %1/%2 уже зарегистрирован!").arg(struct_users.host.c_str(), struct_users.system_user.c_str()));
             return;
         }
         json query_param = {
@@ -2687,12 +2705,38 @@ void MainWindow::add_cert_user(const arcirk::database::cert_users &parent, const
             {"values", pre::json::to_json(struct_users)},
             {"where_values", {}}
         };
+        QString error_message;
+        auto error = [&error_message](const QString& what, const QString& command, const QString& err) -> void
+        {
+            qCritical() << QDateTime::currentDateTime().toString("hh:mm:ss") << what << command << err;
+
+            if(err.indexOf("UNIQUE constraint failed: CertUsers.ref") != -1){
+                error_message = "Пользователь уже зарегистрирован!";
+            }else
+                error_message = "Ошибка регистрации!";
+
+        };
+        auto c_err = connect(m_client, &WebSocketClient::error, error);
 
         std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
         auto resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::ExecuteSqlQuery), json{
                                              {"query_param", base64_param}
                                          });
 
+        std::string result = "success";
+        if(resp.is_string())
+            result = resp.get<std::string>();
+
+        if(result == "success"){
+            //QMessageBox::information(this, "Регистрация пользователя", "Пользователь успешно зарегистрирован!");
+            trayShowMessage("Пользователь успешно зарегистрирован!");
+        }else{
+            if(!error_message.isEmpty()){
+                //QMessageBox::information(this, "Регистрация пользователя", error_message);
+                displayError("Регистрация пользователя", error_message);
+            }
+        }
+        disconnect(c_err);
     }
 }
 
