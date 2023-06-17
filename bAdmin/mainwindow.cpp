@@ -29,6 +29,8 @@
 #include "commandline.h"
 #include <fmt/core.h>
 
+//#include "crypter/crypter.hpp"
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -74,7 +76,6 @@ MainWindow::MainWindow(QWidget *parent)
         });
         menu.exec(ui->treeView->viewport()->mapToGlobal(pos));
     });
-
 
 }
 

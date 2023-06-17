@@ -20,6 +20,7 @@ SOURCES += \
     commandlineparser.cpp \
     cryptcertificate.cpp \
     cryptcontainer.cpp \
+    crypter/crypter.cpp \
     dialogcertusercache.cpp \
     dialogedit.cpp \
     dialoginfo.cpp \
@@ -51,6 +52,7 @@ HEADERS += \
     commandlineparser.h \
     cryptcertificate.h \
     cryptcontainer.h \
+    crypter/crypter.hpp \
     dialogcertusercache.h \
     dialogedit.h \
     dialoginfo.h \
@@ -111,10 +113,10 @@ INCLUDEPATH += $(BOOST_INCLDUE)
 #LIBS += -L$(BOOST_LIB) -lboost_locale-vc140-mt
 
 CONFIG(debug, debug|release) {
-    LIBS += -LC:/lib/vcpkg/installed/x64-windows/debug/lib -lboost_locale-vc140-mt-gd -lfmtd
+    LIBS += -LC:/lib/vcpkg/installed/x64-windows/debug/lib -lboost_locale-vc140-mt-gd -lfmtd -lcryptopp
     LIBS += -LC:/lib/vcpkg/installed/x64-windows/debug/bin
 } else {
-    LIBS += -LC:/lib/vcpkg/installed/x64-windows/lib -lboost_locale-vc140-mt -lfmt
+    LIBS += -LC:/lib/vcpkg/installed/x64-windows/lib -lboost_locale-vc140-mt -lfmt -lcryptopp
     LIBS += -LC:/lib/vcpkg/installed/x64-windows/bin
 }
 

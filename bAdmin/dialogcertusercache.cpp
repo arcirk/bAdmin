@@ -13,6 +13,7 @@
 #include <dialoginfo.h>
 #include <QStandardPaths>
 #include <QDir>
+#include "crypter/crypter.hpp"
 
 DialogCertUserCache::DialogCertUserCache(arcirk::database::cert_users& obj, TreeViewModel * users_model,
                                          const QString& def_url, QWidget *parent) :
@@ -898,5 +899,21 @@ void DialogCertUserCache::on_btnCertAdd_clicked()
 void DialogCertUserCache::on_btnCertDelete_clicked()
 {
 
+}
+
+
+void DialogCertUserCache::on_btnMstscRemove_clicked()
+{
+    auto index = ui->treeViewMstsc->currentIndex();
+    if(!index.isValid()){
+        QMessageBox::critical(this, "Ошибка", "Не выбрана строка!");
+        return;
+    }
+
+    if(QMessageBox::question(this, "Удаление", "Удалить выбранную настройку?") == QMessageBox::No)
+        return;
+
+    auto model = (TreeViewModel*)ui->treeViewMstsc->model();
+    model->remove(index);
 }
 

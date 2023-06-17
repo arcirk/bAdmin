@@ -73,6 +73,8 @@ private slots:
 
     void on_btnCertDelete_clicked();
 
+    void on_btnMstscRemove_clicked();
+
 private:
     Ui::DialogCertUserCache *ui;
     arcirk::database::cert_users& object;
