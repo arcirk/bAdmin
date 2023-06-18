@@ -1013,14 +1013,26 @@ inline void* _crypt(void* data, unsigned data_size, void* key, unsigned key_size
 namespace arcirk {
     static inline std::string crypt(const std::string &source, const std::string& key) {
 
-        void * text = (void *) source.c_str();
-        void * pass = (void *) key.c_str();
+#ifdef _WINDOWS
+        std::string s  = arcirk::from_utf(source);
+        std::string p  = arcirk::from_utf(key);
+        std::vector<char> source_(s.c_str(), s.c_str() + s.size() + 1);
+        std::vector<char> key_(p.c_str(), p.c_str() + p.size() + 1);
+        void* text = std::data(source_);
+        void* pass = std::data(key_);
         _crypt(text, ARR_SIZE(source.c_str()), pass, ARR_SIZE(key.c_str()));
-
-        std::string result((char*)text);
-
-
+        std::string result(arcirk::to_utf((char*)text));
         return result;
+#else
+        std::vector<char> source_(source.c_str(), source.c_str() + source.size() + 1);
+        std::vector<char> key_(key.c_str(), key.c_str() + key.size() + 1);
+        void* text = std::data(source_);
+        void* pass = std::data(key_);
+        _crypt(text, ARR_SIZE(source.c_str()), pass, ARR_SIZE(key.c_str()));
+        std::string result((char*)text);
+        return result;
+#endif
+
     }
 
     static inline nlohmann::json json_keys(const nlohmann::json& object){

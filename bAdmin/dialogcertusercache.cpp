@@ -13,7 +13,7 @@
 #include <dialoginfo.h>
 #include <QStandardPaths>
 #include <QDir>
-#include "crypter/crypter.hpp"
+//#include "crypter/crypter.hpp"
 
 DialogCertUserCache::DialogCertUserCache(arcirk::database::cert_users& obj, TreeViewModel * users_model,
                                          const QString& def_url, QWidget *parent) :

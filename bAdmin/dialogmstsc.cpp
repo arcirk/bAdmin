@@ -6,7 +6,7 @@
 #include <QMessageBox>
 #include "dialogselectintree.h"
 #include <QUuid>
-#include <crypter/crypter.hpp>
+//#include <crypter/crypter.hpp>
 
 DialogMstsc::DialogMstsc(mstsc_options& mst, QWidget *parent) :
     QDialog(parent),
@@ -30,13 +30,13 @@ DialogMstsc::DialogMstsc(mstsc_options& mst, QWidget *parent) :
     ui->txtName->setText(_mstsc.name.c_str());
     ui->spinPort->setValue(_mstsc.port == 0 ? DEF_MSTSC_PORT : _mstsc.port);
     ui->chkDefaultPort->setCheckState(_mstsc.def_port ? Qt::Checked : Qt::Unchecked);
-    //QString _pwd = _mstsc.password.c_str();
+    QString _pwd = _mstsc.password.c_str();
 
     if(!_mstsc.password.empty()){
-       // QString hashKey = QString::fromStdString(WebSocketClient::crypt(_pwd, QString(CRYPT_KEY).toUtf8()));
-        auto crypter = arcirk::cryptography::crypt_utils();
+        QString hashKey = QString::fromStdString(WebSocketClient::crypt(_pwd, QString(CRYPT_KEY).toUtf8()));
+        //auto crypter = arcirk::cryptography::crypt_utils();
         //auto pwd = QByteArray::fromBase64(_pwd.toUtf8()).toStdString();
-        QString hashKey = crypter.decrypt_string(_mstsc.password).c_str();
+        //QString hashKey = crypter.decrypt_string(_mstsc.password).c_str();
         //QString hashKey = QString::fromStdString(arcirk::to_utf(crypter.decrypt_string(arcirk::from_utf(_mstsc.password))));
         ui->txtPassword->setText(hashKey);
     }
@@ -91,9 +91,9 @@ void DialogMstsc::accept()
     _mstsc.reset_user = ui->chkEnableCmdKey->checkState() == Qt::Checked ? true : false;
     QString _pwd = ui->txtPassword->text();
     if(!_pwd.isEmpty()){
-        //auto hashKey = WebSocketClient::crypt(_pwd, CRYPT_KEY);
-        auto crypter = arcirk::cryptography::crypt_utils();
-        auto hashKey = crypter.encrypt_string(_pwd.toStdString());
+        auto hashKey = WebSocketClient::crypt(_pwd, CRYPT_KEY);
+//        auto crypter = arcirk::cryptography::crypt_utils();
+//        auto hashKey = crypter.encrypt_string(_pwd.toStdString());
         _mstsc.password = hashKey;
     }
     _mstsc.user_name = ui->txtUserName->text().trimmed().toStdString();

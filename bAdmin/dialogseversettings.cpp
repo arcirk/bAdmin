@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QToolButton>
+//#include "crypter/crypter.hpp"
 
 DialogSeverSettings::DialogSeverSettings(arcirk::server::server_config& conf, arcirk::client::client_conf& conf_cl, QWidget *parent) :
     QDialog(parent),
@@ -13,6 +14,7 @@ DialogSeverSettings::DialogSeverSettings(arcirk::server::server_config& conf, ar
 {
     ui->setupUi(this);
 
+    using namespace arcirk::cryptography;
 
     ui->edtServerName->setText(conf.ServerName.c_str());
     ui->edtServerHost->setText(conf.ServerHost.c_str());
@@ -22,10 +24,16 @@ DialogSeverSettings::DialogSeverSettings(arcirk::server::server_config& conf, ar
     ui->edtProfileDir->setText(conf.ServerWorkingDirectory.c_str());
     ui->edtHSHost->setText(conf.HSHost.c_str());
     ui->edtHSUser->setText(conf.HSUser.c_str());
-    ui->edtHSPassword->setText(WebSocketClient::crypt(conf.HSPassword.c_str(), "my_key").c_str());
+    std::string http_pass;
+    if(!conf.HSPassword.empty())
+        http_pass = WebSocketClient::crypt(conf.HSPassword.c_str(), CRYPT_KEY);//crypt_utils().decrypt_string(conf.HSPassword);
+    ui->edtHSPassword->setText(http_pass.c_str());
     ui->edtWebDavHost->setText(conf.WebDavHost.c_str());
     ui->edtWebDavUser->setText(conf.WebDavUser.c_str());
-    ui->edtWebDavPwd->setText(WebSocketClient::crypt(conf.WebDavPwd.c_str(), "my_key").c_str());
+    std::string dav_pass;
+    if(!conf.WebDavPwd.empty())
+        dav_pass = WebSocketClient::crypt(conf.WebDavPwd.c_str(), CRYPT_KEY);// crypt_utils().decrypt_string(conf.WebDavPwd);
+    ui->edtWebDavPwd->setText(dav_pass.c_str());
     if(conf.SQLFormat == 0)
         ui->radioSqlite->setChecked(true);
     else
@@ -33,7 +41,10 @@ DialogSeverSettings::DialogSeverSettings(arcirk::server::server_config& conf, ar
 
     ui->edtSQLHost->setText(conf.SQLHost.c_str());
     ui->edtSQLUser->setText(conf.SQLUser.c_str());
-    ui->edtSQLPassword->setText(WebSocketClient::crypt(conf.SQLPassword.c_str(), "my_key").c_str());
+    std::string sql_pass;
+    if(!conf.SQLPassword.empty())
+        sql_pass = WebSocketClient::crypt(conf.SQLPassword.c_str(), CRYPT_KEY);//crypt_utils().decrypt_string(conf.SQLPassword);
+    ui->edtSQLPassword->setText(sql_pass.c_str());
     ui->edtExchangePlan->setText(conf.ExchangePlan.c_str());
 
     ui->edtPriceCheckerRepo->setText(conf_cl.price_checker_repo.c_str());
@@ -50,6 +61,8 @@ DialogSeverSettings::~DialogSeverSettings()
 
 void DialogSeverSettings::accept()
 {
+    using namespace arcirk::cryptography;
+
     conf_.AllowDelayedAuthorization = ui->chAllowDelayedAuth->checkState() == Qt::CheckState::Checked ? 1 : 0;
     conf_.UseAuthorization = ui->chAutorizationMode->checkState() == Qt::CheckState::Checked ? 1 : 0;
     conf_.ServerName = ui->edtServerName->text().toStdString();
@@ -59,16 +72,16 @@ void DialogSeverSettings::accept()
     conf_.HSHost = ui->edtHSHost->text().toStdString();
     conf_.HSUser = ui->edtHSUser->text().toStdString();
     if(ui->btnEditHSPassword->isChecked())
-        conf_.HSPassword = WebSocketClient::crypt(ui->edtHSPassword->text(), "my_key");
+        conf_.HSPassword = WebSocketClient::crypt(ui->edtHSPassword->text(), CRYPT_KEY); //crypt_utils().encrypt_string(ui->edtHSPassword->text().toStdString());
     conf_.WebDavHost = ui->edtWebDavHost->text().toStdString();
     conf_.WebDavUser = ui->edtWebDavUser->text().toStdString();
     if(ui->btnEditWebDavPwd->isChecked())
-        conf_.WebDavPwd = WebSocketClient::crypt(ui->edtWebDavPwd->text(), "my_key");
+        conf_.WebDavPwd = WebSocketClient::crypt(ui->edtWebDavPwd->text(), CRYPT_KEY); //crypt_utils().encrypt_string(ui->edtWebDavPwd->text().toStdString()); //WebSocketClient::crypt(ui->edtWebDavPwd->text(), "my_key");
     conf_.SQLFormat = ui->radioSqlite->isChecked() ? 0 : 1;
     conf_.SQLHost = ui->edtSQLHost->text().toStdString();
     conf_.SQLUser = ui->edtSQLUser->text().toStdString();
     if(ui->btnEditSQLPassword->isChecked())
-        conf_.SQLPassword = WebSocketClient::crypt( ui->edtSQLPassword->text(), "my_key");
+        conf_.SQLPassword = WebSocketClient::crypt(ui->edtSQLPassword->text(), CRYPT_KEY); //crypt_utils().encrypt_string(ui->edtSQLPassword->text().toStdString()); //WebSocketClient::crypt( ui->edtSQLPassword->text(), "my_key");
     conf_.ExchangePlan = ui->edtExchangePlan->text().toStdString();
     conf_.WriteJournal = ui->chWriteLog->isChecked();
 

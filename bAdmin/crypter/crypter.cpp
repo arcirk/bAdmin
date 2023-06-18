@@ -262,7 +262,7 @@ std::string crypt_utils::encrypt_string(const std::string& plain_text)
     catch (const CryptoPP::Exception& e)
     {
         cerr << e.what() << endl;
-        exit(1);
+        return "";
     }
 
     return arcirk::to_utf(base64_encode(cipher));
@@ -312,7 +312,7 @@ std::string crypt_utils::decrypt_string(const std::string& cipher_text)
         catch (const CryptoPP::Exception& e)
         {
             cerr << e.what() << endl;
-            exit(1);
+            return "";
         }
 
     return arcirk::to_utf(recovered);
