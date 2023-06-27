@@ -168,3 +168,4 @@ void DialogSeverSettings::on_btnSelPriceCheckerRepo_clicked()
     }
 }
 
+

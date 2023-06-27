@@ -282,6 +282,8 @@ nlohmann::json CertUser::get_local_containers()
 
    std::string result_ = arcirk::to_utf(cmd_text.toStdString(), "cp866");
 
+   qDebug() << __FUNCTION__ << qPrintable(result_.data());
+
    auto info = CommandLineParser::parse(result_.c_str(), csptestGetConteiners);
 
    return info;

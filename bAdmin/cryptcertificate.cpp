@@ -6,6 +6,8 @@
 #include <QFileInfo>
 #include <QEventLoop>
 #include "commandlineparser.h"
+#include <QUrl>
+#include <QTemporaryFile>
 
 bool CryptCertificate::isValid()
 {
@@ -55,7 +57,26 @@ bool CryptCertificate::fromFile(const QString &path)
 {
     using json = nlohmann::json;
 
+    QString path_(path);
+
     is_valid = false;
+
+    QUrl url(path);
+
+    if(!url.isLocalFile()){
+        QFile f(path);
+        if(f.open(QFile::ReadOnly)){
+            QByteArray ba = f.readAll();
+            f.close();
+            auto tmp = new QTemporaryFile();
+            tmp->setAutoRemove(false);
+            tmp->open();
+            tmp->write(ba);
+            path_ = tmp->fileName();
+            tmp->close();
+            delete tmp;
+        }
+    }
 
     QFileInfo inf(path);
     QString suffix = inf.completeSuffix();
@@ -66,9 +87,9 @@ bool CryptCertificate::fromFile(const QString &path)
 
     QEventLoop loop;
 
-    auto started = [&cmd, &path]() -> void
+    auto started = [&cmd, &path_]() -> void
     {
-        QString s = QString("certutil \"%1\" & exit").arg(path);
+        QString s = QString("certutil \"%1\" & exit").arg(QDir::toNativeSeparators(path_));
         cmd.send(s, CmdCommand::certutilGetCertificateInfo);
     };
     loop.connect(&cmd, &CommandLine::started_process, started);
@@ -100,7 +121,9 @@ bool CryptCertificate::fromFile(const QString &path)
     cmd.start();
     loop.exec();
 
-    std::string result_ = arcirk::to_utf(cmd_text.toStdString(), "cp866");
+    //std::string result_ = arcirk::to_utf(cmd_text.toStdString(), "cp866");
+    std::string result_ = arcirk::to_utf(cmd_text.toStdString(), "cp1251");
+    qDebug() << qPrintable(result_.c_str());
     result = CommandLineParser::parse(result_.c_str(), CmdCommand::certutilGetCertificateInfo);
 
     if(result.empty() || !result.is_object())
@@ -119,11 +142,14 @@ bool CryptCertificate::fromFile(const QString &path)
     cert_info_.cache = result.dump();
 
     try {
-        arcirk::read_file(QTextCodec::codecForName("CP1251")->fromUnicode(path).toStdString(), cert_info_.data);
+        arcirk::read_file(QTextCodec::codecForName("CP1251")->fromUnicode(path_).toStdString(), cert_info_.data);
     } catch (const std::exception& e) {
         qCritical() << e.what();
     }
 
+//    if(tmp.isWritable()){
+//        tmp.remove();
+//    }
     is_valid = true;
 
     return true;

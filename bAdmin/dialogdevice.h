@@ -26,6 +26,13 @@ public:
     arcirk::database::devices get_result() const;
     arcirk::database::devices_view get_view_result() const;
 
+private slots:
+
+
+    void on_editRef_toggled(bool checked);
+
+    void on_edtRef_editingFinished();
+
 private:
     Ui::DialogDevice *ui;
     arcirk::database::devices result_;

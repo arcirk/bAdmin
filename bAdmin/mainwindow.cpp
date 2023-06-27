@@ -28,6 +28,7 @@
 #include "dialogselectintree.h"
 #include "commandline.h"
 #include <fmt/core.h>
+#include "dialogselect.h"
 
 //#include "crypter/crypter.hpp"
 
@@ -49,6 +50,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_client, &WebSocketClient::connectionSuccess, this, &MainWindow::connectionSuccess);
     connect(m_client, &WebSocketClient::displayError, this, &MainWindow::displayError);
     connect(m_client, &WebSocketClient::serverResponse, this, &MainWindow::serverResponse);
+    connect(m_client, &WebSocketClient::error, this, &MainWindow::wsError);
 
     m_client->set_system_user(current_user->user_name());
 
@@ -205,26 +207,29 @@ void MainWindow::serverResponse(const arcirk::server::server_response &message)
     }else if(message.command == arcirk::enum_synonym(arcirk::server::server_commands::GetDatabaseTables)){
         tableResetModel(arcirk::server::DatabaseTables, message.result.data());
     }else if(message.command == arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery)){
-        if(message.result == "error"){
+        if(message.result == WS_RESULT_ERROR){
             qDebug() << __FUNCTION__ << "error result ExecuteSqlQuery";
             return;
-        }
-        auto param = nlohmann::json::parse(QByteArray::fromBase64(message.param.data()));
-        auto query_param = param.value("query_param", "");
-        if(!query_param.empty()){
-            auto param_ = nlohmann::json::parse(QByteArray::fromBase64(query_param.data()));
-            auto table_name = param_.value("table_name", "");
-            if(table_name == "Devices" || table_name == "DevicesView"){
-                tableResetModel(arcirk::server::Devices, message.result.data());
-            }else if(table_name == "Certificates"){
-                tableResetModel(arcirk::server::Certificates, message.result.data());
-//            }else if(table_name == "CertUsers"){
-//                tableResetModel(arcirk::server::CertUsers, message.result.data());
-            }else if(table_name == "Containers"){
-                tableResetModel(arcirk::server::Containers, message.result.data());
+        }else if(message.result == WS_RESULT_SUCCESS){
+            qDebug() << __FUNCTION__ << "success result ExecuteSqlQuery";
+            return;
+        }else{
+            auto param = nlohmann::json::parse(QByteArray::fromBase64(message.param.data()));
+            auto query_param = param.value("query_param", "");
+            if(!query_param.empty()){
+                auto param_ = nlohmann::json::parse(QByteArray::fromBase64(query_param.data()));
+                auto table_name = param_.value("table_name", "");
+                if(table_name == "Devices" || table_name == "DevicesView"){
+                    tableResetModel(arcirk::server::Devices, message.result.data());
+                }else if(table_name == "Certificates"){
+                    tableResetModel(arcirk::server::Certificates, message.result.data());
+    //            }else if(table_name == "CertUsers"){
+    //                tableResetModel(arcirk::server::CertUsers, message.result.data());
+                }else if(table_name == "Containers"){
+                    tableResetModel(arcirk::server::Containers, message.result.data());
+                }
             }
         }
-
     }else if(message.command == arcirk::enum_synonym(arcirk::server::server_commands::ProfileDeleteFile)){
         if(message.message == "OK"){
             QMessageBox::information(this, "Удаление файла", "Файл успешно удален!");
@@ -399,6 +404,11 @@ void MainWindow::onTreeFetch()
     ui->treeView->resizeColumnToContents(0);
 }
 
+void MainWindow::wsError(const QString &what, const QString &command, const QString &err)
+{
+    qCritical() << what << command << err;
+}
+
 void MainWindow::update_rdp_files(const nlohmann::json &items)
 {
     QDir dir(cache_mstsc_directory());
@@ -433,6 +443,42 @@ void MainWindow::update_rdp_files(const nlohmann::json &items)
 
     }
 
+}
+
+void MainWindow::database_get_containers_synch()
+{
+
+    auto query_param = nlohmann::json{
+        {"table_name", "Certificates"},
+        {"where_values", nlohmann::json{}},
+        {"query_type", "select"},
+        {"empty_column", false},
+        {"line_number", false},
+        {"values", json{
+                "first",
+                "ref",
+                "private_key",
+                "subject",
+                "issuer",
+                "not_valid_before",
+                "not_valid_after",
+                "parent_user",
+                "serial",
+                "sha1",
+                "suffix",
+                "cache"
+            }
+        }
+    };
+    std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+    auto resp = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery), json{
+                                         {"query_param", base64_param}
+                                     });
+    if(resp  != WS_RESULT_ERROR){
+        if(resp.is_object()){
+            resetModel(arcirk::server::server_objects::Containers, resp);
+        }
+    }
 }
 
 void MainWindow::on_mnuConnect_triggered()
@@ -521,12 +567,13 @@ void MainWindow::tableResetModel(server::server_objects key, const QByteArray& r
 
     if(key == OnlineUsers){
 
-        if(!resp.isEmpty() && resp != "error"){
+        if(!resp.isEmpty() && resp != WS_RESULT_ERROR){
             auto json = QByteArray::fromBase64(resp);
             //qDebug() << qPrintable(json);
             m_models[OnlineUsers]->set_table(nlohmann::json::parse(json));
-            QVector<QString> col_order{"app_name", "host_name", "address", "user_name", "role", "start_date", "session_uuid", "user_uuid", "device_id"};
-            m_models[OnlineUsers]->columns_establish_order(col_order);
+            if(!m_order_columns.find(key)->isEmpty()){
+                m_models[OnlineUsers]->columns_establish_order(m_order_columns[key]);
+            }
             update_icons(OnlineUsers, m_models[OnlineUsers]);
             m_models[OnlineUsers]->reset();
         }
@@ -558,19 +605,24 @@ void MainWindow::tableResetModel(server::server_objects key, const QByteArray& r
             m_models[DatabaseTables]->set_table(tbls);
             m_models[DatabaseTables]->reset();
         }
-    }else if (key == Devices){
-        auto tbls = QByteArray::fromBase64(resp);
-        m_models[Devices]->set_table(nlohmann::json::parse(tbls));
-        update_icons(Devices, m_models[Devices]);
-        m_models[Devices]->reset();
-    }else if (key == Services){
-        auto tbls = QByteArray::fromBase64(resp);
-        m_models[Services]->set_table(nlohmann::json::parse(tbls));
-        update_icons(Services, m_models[Services]);
-        m_models[Services]->reset();
+//    }else if (key == Devices){
+//        auto tbls = QByteArray::fromBase64(resp);
+//        m_models[Devices]->set_table(nlohmann::json::parse(tbls));
+//        update_icons(Devices, m_models[Devices]);
+//        m_models[Devices]->reset();
+//    }else if (key == Services){
+//        auto tbls = QByteArray::fromBase64(resp);
+//        m_models[Services]->set_table(nlohmann::json::parse(tbls));
+//        update_icons(Services, m_models[Services]);
+//        m_models[Services]->reset();
     }else{
         auto tbls = QByteArray::fromBase64(resp);
-        m_models[key]->set_table(nlohmann::json::parse(tbls));
+        auto table = nlohmann::json::parse(tbls);
+        m_models[key]->set_table(table);
+        if(m_order_columns.find(key) != m_order_columns.end()){
+            m_models[key]->columns_establish_order(m_order_columns[key]);
+        }
+        update_icons(key, m_models[key]);
         m_models[key]->reset();
     }
 
@@ -588,6 +640,9 @@ void MainWindow::resetModel(server::server_objects key, const nlohmann::json &da
     using namespace arcirk::server;
     m_models[key]->set_table(data);
     m_models[key]->reset();
+    if(m_order_columns.find(key) != m_order_columns.end()){
+        m_models[key]->columns_establish_order(m_order_columns[key]);
+    }
     update_icons(key, m_models[key]);
 
 //    if (key == LocalhostUserCertificates){
@@ -781,19 +836,188 @@ void MainWindow::fillDefaultTree()
 void MainWindow::on_toolButton_clicked()
 {
     auto model = (TreeViewModel*)ui->treeView->model();
-    auto index = ui->treeView->currentIndex();
-    if(!index.isValid()){
-        QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
-        return;
-    }
+//    auto index = ui->treeView->currentIndex();
+//    if(!index.isValid()){
+//        QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
+//        return;
+//    }
 
     using namespace arcirk::server;
     using json = nlohmann::json;
     if(model->server_object() == arcirk::server::ProfileDirectory){
 
+    }else if(model->server_object() == arcirk::server::Certificates){
+        database_get_certificates_asynch();
+    }else if(model->server_object() == arcirk::server::Containers){
+        database_get_containers_asynch();
     }
 }
 
+void MainWindow::database_get_deviceview_asynch(){
+    using namespace arcirk::server;
+    if(m_client->isConnected()){
+        auto query_param = nlohmann::json{
+            {"table_name", "DevicesView"},
+            {"where_values", nlohmann::json{}},
+            {"query_type", "select"}
+        };
+        m_client->send_command(arcirk::server::server_commands::ExecuteSqlQuery, nlohmann::json{
+                                   {"query_param", QByteArray(query_param.dump().data()).toBase64().toStdString()}
+                               });
+    }
+}
+
+void MainWindow::database_insert_certificate()
+{
+    using namespace arcirk::server;
+
+    auto result = QFileDialog::getOpenFileName(this, "Выбрать файл на диске", "", tr("Файлы сетрификатов (*.cer *.crt)"));
+    if(!result.isEmpty()){
+        //ByteArray data{};
+        try {
+            auto cert = CryptCertificate(this);
+            cert.fromFile(result);
+            if(cert.isValid()){
+                ByteArray ba = cert.getData().data;
+                if(ba.size() > 0){
+                    //сначала запись добавим
+                    auto struct_certs = arcirk::database::certificates();
+                    struct_certs._id = 0;
+                    struct_certs.suffix = cert.getData().suffix;
+                    struct_certs.deletion_mark = 0;
+                    struct_certs.is_group = 0;
+                    struct_certs.first = cert.sinonym();
+                    struct_certs.not_valid_after = cert.getData().not_valid_after;
+                    struct_certs.not_valid_before = cert.getData().not_valid_before;
+                    struct_certs.serial = cert.getData().serial;
+                    struct_certs.version = 0;
+                    struct_certs.ref = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
+                    struct_certs.parent = arcirk::uuids::nil_string_uuid();
+                    struct_certs.parent_user = cert.parent();
+                    struct_certs.issuer = cert.issuer_briefly();
+                    struct_certs.subject = cert.subject_briefly();
+                    struct_certs.cache = cert.getData().cache;
+                    struct_certs.sha1 = cert.sha1();
+
+                    nlohmann::json query_param = {
+                        {"table_name", arcirk::enum_synonym(tables::tbCertificates)},
+                        {"query_type", "insert"},
+                        {"values", pre::json::to_json(struct_certs)}
+                    };
+                    std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+                    auto resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::ExecuteSqlQuery), json{
+                                                         {"query_param", base64_param}
+                                                     });
+
+                    if(resp  != "error"){
+                        //обновим данные
+                        query_param = {
+                            {"table_name", arcirk::enum_synonym(tables::tbCertificates)},
+                            {"where_values", json{
+                                 {"ref", struct_certs.ref}
+                             }}
+                        };
+                        base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+                        json param{
+                            {"destantion", base64_param},
+                            {"file_name", result.toStdString()}
+                        };
+                        resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::DownloadFile), param, ba);
+                        if(resp  != "error"){
+                            auto query_param = nlohmann::json{
+                                {"table_name", "Certificates"},
+                                {"where_values", nlohmann::json{}},
+                                {"query_type", "select"},
+                                {"empty_column", false},
+                                {"line_number", false},
+                                {"values", json{
+                                        "first",
+                                        "ref",
+                                        "private_key",
+                                        "subject",
+                                        "issuer",
+                                        "not_valid_before",
+                                        "not_valid_after",
+                                        "parent_user",
+                                        "serial",
+                                        "sha1",
+                                        "cache"
+                                    }
+                                }
+                            };
+                            m_client->send_command(arcirk::server::server_commands::ExecuteSqlQuery, nlohmann::json{
+                                                       {"query_param", QByteArray(query_param.dump().data()).toBase64().toStdString()}
+                                                   });
+                        }
+                    }
+                }
+            }else{
+                displayError("Ошибка", "Ошибка загрузки файла!");
+            }
+        } catch (const std::exception& e) {
+            QMessageBox::critical(this, "Ошибка", e.what());
+            return;
+        }
+
+    }
+}
+
+void MainWindow::database_get_certificates_asynch(){
+    using namespace arcirk::server;
+    if(m_client->isConnected()){
+        auto query_param = nlohmann::json{
+            {"table_name", arcirk::enum_synonym(Certificates)},
+            {"where_values", nlohmann::json{}},
+            {"query_type", "select"},
+            {"values", json{
+                    "first",
+                    "ref",
+                    "private_key",
+                    "subject",
+                    "issuer",
+                    "not_valid_before",
+                    "not_valid_after",
+                    "parent_user",
+                    "serial",
+                    "sha1",
+                    "suffix",
+                    "cache"
+                }
+            }
+        };
+        m_client->send_command(arcirk::server::server_commands::ExecuteSqlQuery, nlohmann::json{
+                                   {"query_param", QByteArray(query_param.dump().data()).toBase64().toStdString()}
+                               });
+    }
+}
+
+void MainWindow::database_get_containers_asynch(){
+    using namespace arcirk::server;
+    if(m_client->isConnected()){
+        auto values_ = pre::json::to_json(containers());
+        values_.erase("data");
+        auto values = arcirk::json_keys(values_);
+        auto query_param = nlohmann::json{
+            {"table_name", arcirk::enum_synonym(Containers)},
+            {"where_values", nlohmann::json{}},
+            {"query_type", "select"},
+            {"values", json{
+                    "first",
+                    "ref",
+                    "parent_user",
+                    "subject",
+                    "issuer",
+                    "not_valid_before",
+                    "not_valid_after",
+                    "cache"
+                }
+            }
+        };
+        m_client->send_command(arcirk::server::server_commands::ExecuteSqlQuery, nlohmann::json{
+                                   {"query_param", QByteArray(query_param.dump().data()).toBase64().toStdString()}
+                               });
+    }
+}
 void MainWindow::createModels()
 {
     using namespace arcirk::server;
@@ -929,18 +1153,19 @@ void MainWindow::on_treeWidget_itemClicked(QTreeWidgetItem *item, int column)
         if(m_client->isConnected())
             m_client->send_command(arcirk::server::server_commands::GetDatabaseTables, nlohmann::json{});
     }else if(key == QString(arcirk::enum_synonym(Devices).data())){
-        if(m_client->isConnected()){
-            auto query_param = nlohmann::json{
-                {"table_name", "DevicesView"},
-                {"where_values", nlohmann::json{}},
-                {"query_type", "select"},
-                {"empty_column", false},
-                {"line_number", false}
-            };
-            m_client->send_command(arcirk::server::server_commands::ExecuteSqlQuery, nlohmann::json{
-                                       {"query_param", QByteArray(query_param.dump().data()).toBase64().toStdString()}
-                                   });
-        }
+//        if(m_client->isConnected()){
+//            auto query_param = nlohmann::json{
+//                {"table_name", "DevicesView"},
+//                {"where_values", nlohmann::json{}},
+//                {"query_type", "select"},
+//                {"empty_column", false},
+//                {"line_number", false}
+//            };
+//            m_client->send_command(arcirk::server::server_commands::ExecuteSqlQuery, nlohmann::json{
+//                                       {"query_param", QByteArray(query_param.dump().data()).toBase64().toStdString()}
+//                                   });
+//        }
+        database_get_deviceview_asynch();
     }else if(key == QString(arcirk::enum_synonym(DatabaseUsers).data())){
         if(m_models.find(DatabaseUsers) != m_models.end()){
             m_models[DatabaseUsers]->fetchRoot("Users");
@@ -952,64 +1177,13 @@ void MainWindow::on_treeWidget_itemClicked(QTreeWidgetItem *item, int column)
     }else if(key == QString(arcirk::enum_synonym(Services).data())){
         m_client->send_command(arcirk::server::server_commands::GetTasks, nlohmann::json{});
     }else if(key == QString(arcirk::enum_synonym(Certificates).data())){
-        if(m_client->isConnected()){
-            auto query_param = nlohmann::json{
-                {"table_name", "Certificates"},
-                {"where_values", nlohmann::json{}},
-                {"query_type", "select"},
-                {"empty_column", false},
-                {"line_number", false},
-                {"values", json{
-                        "first",
-                        "ref",
-                        "private_key",
-                        "subject",
-                        "issuer",
-                        "not_valid_before",
-                        "not_valid_after",
-                        "parent_user",
-                        "serial",
-                        "sha1",
-                        "suffix",
-                        "cache"
-                    }
-                }
-            };
-            m_client->send_command(arcirk::server::server_commands::ExecuteSqlQuery, nlohmann::json{
-                                       {"query_param", QByteArray(query_param.dump().data()).toBase64().toStdString()}
-                                   });
-        }
+        database_get_certificates_asynch();
     }else if(key == QString(arcirk::enum_synonym(CertUsers).data())){
         if(m_models.find(CertUsers) != m_models.end()){
             m_models[CertUsers]->fetchRoot("CertUsers");
         }
     }else if(key == QString(arcirk::enum_synonym(Containers).data())){
-        if(m_client->isConnected()){
-            auto values_ = pre::json::to_json(containers());
-            values_.erase("data");
-            auto values = arcirk::json_keys(values_);
-            auto query_param = nlohmann::json{
-                {"table_name", arcirk::enum_synonym(Containers)},
-                {"where_values", nlohmann::json{}},
-                {"query_type", "select"},
-                {"empty_column", false},
-                {"line_number", false},
-                {"values", json{
-                        "first",
-                        "ref",
-                        "parent_user",
-                        "subject",
-                        "issuer",
-                        "not_valid_before",
-                        "not_valid_after",
-                        "cache"
-                    }
-                }
-            };
-            m_client->send_command(arcirk::server::server_commands::ExecuteSqlQuery, nlohmann::json{
-                                       {"query_param", QByteArray(query_param.dump().data()).toBase64().toStdString()}
-                                   });
-        }
+        database_get_containers_asynch();
     }else if(key == QString(arcirk::enum_synonym(LocalhostUserCertificates).data())){
         auto certs = current_user->getCertificates(true);
         if(certs.is_object() && !certs.empty()){
@@ -1103,8 +1277,10 @@ void MainWindow::update_icons(arcirk::server::server_objects key, TreeViewModel 
                 model->set_icon(model->index(i,0,parent), app_icons[ExtendedLib].first);
             }
         }
-    }else if(key == LocalhostUserCertificates){
+    }else if(key == LocalhostUserCertificates || key == Certificates){
         model->set_rows_icon(QIcon(":/img/cert16NoKey.png"));
+    }else if(key == Containers){
+        model->set_rows_icon(QIcon(":/img/cert16Key.png"));
     }else if(key == arcirk::server::LocalhostUserContainers){
         using namespace arcirk::cryptography;
         int ind = model->get_column_index("type");
@@ -1152,7 +1328,7 @@ void MainWindow::insert_container(CryptContainer &cnt)
     auto resp = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery), json{
                                          {"query_param", base64_param}
                                      });
-    if(resp  != "error"){
+    if(resp  != WS_RESULT_ERROR){
         //обновим данные
         query_param = {
             {"table_name", arcirk::enum_synonym(tables::tbContainers)},
@@ -1338,7 +1514,7 @@ void MainWindow::edit_cert_user(const QModelIndex &index)
                                              {"query_param", base64_param}
                                          });
         if(resp.is_string()){
-            if(resp.get<std::string>() == "success"){
+            if(resp.get<std::string>() == WS_RESULT_SUCCESS){
                 model->set_object(index ,pre::json::to_json(struct_users));
                 update_icons(server_objects::CertUsers, model);
             }
@@ -1457,7 +1633,7 @@ void MainWindow::on_treeView_doubleClicked(const QModelIndex &index)
                                                      {"query_param", base64_param}
                                                  });
                 if(resp.is_string()){
-                    if(resp.get<std::string>() == "success"){
+                    if(resp.get<std::string>() == WS_RESULT_SUCCESS){
                         model->set_object(index ,pre::json::to_json(struct_users));
                         update_icons(server_objects::DatabaseUsers, model);
                     }
@@ -1493,9 +1669,11 @@ void MainWindow::on_treeView_doubleClicked(const QModelIndex &index)
                                                          {"query_param", base64_param}
                                                      });
                     if(resp.is_string()){
-                        if(resp.get<std::string>() == "success"){
+                        if(resp.get<std::string>() == WS_RESULT_SUCCESS){
                             model->set_object(index ,pre::json::to_json(dlg.get_view_result()));
                             update_icons(server_objects::Devices, model);
+                        }else if(resp.get<std::string>() == WS_RESULT_ERROR){
+                            displayError("Ошибка", "Ошибка изменения записи!");
                         }
                     }
                     update_icons(arcirk::server::Devices, model);
@@ -1595,93 +1773,7 @@ void MainWindow::on_btnAdd_clicked()
 
         }
     }else if(model->server_object() == arcirk::server::Certificates){
-        auto result = QFileDialog::getOpenFileName(this, "Выбрать файл на диске", "", tr("Файлы сетрификатов (*.cer *.crt)"));
-        if(!result.isEmpty()){
-            //ByteArray data{};
-            try {
-                auto cert = CryptCertificate(this);
-                cert.fromFile(result);
-                if(cert.isValid()){
-                    ByteArray ba = cert.getData().data;
-                    if(ba.size() > 0){
-                        //сначала запись добавим
-                        auto struct_certs = arcirk::database::certificates();
-                        struct_certs._id = 0;
-                        struct_certs.suffix = cert.getData().suffix;
-                        struct_certs.deletion_mark = 0;
-                        struct_certs.is_group = 0;
-                        struct_certs.first = cert.sinonym();
-                        struct_certs.not_valid_after = cert.getData().not_valid_after;
-                        struct_certs.not_valid_before = cert.getData().not_valid_before;
-                        struct_certs.serial = cert.getData().serial;
-                        struct_certs.version = 0;
-                        struct_certs.ref = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
-                        struct_certs.parent = arcirk::uuids::nil_string_uuid();
-                        struct_certs.parent_user = cert.parent();
-                        struct_certs.issuer = cert.issuer_briefly();
-                        struct_certs.subject = cert.subject_briefly();
-                        struct_certs.cache = cert.getData().cache;
-                        struct_certs.sha1 = cert.sha1();
-
-                        nlohmann::json query_param = {
-                            {"table_name", arcirk::enum_synonym(tables::tbCertificates)},
-                            {"query_type", "insert"},
-                            {"values", pre::json::to_json(struct_certs)}
-                        };
-                        std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
-                        auto resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::ExecuteSqlQuery), json{
-                                                             {"query_param", base64_param}
-                                                         });
-
-                        if(resp  != "error"){
-                            //обновим данные
-                            query_param = {
-                                {"table_name", arcirk::enum_synonym(tables::tbCertificates)},
-                                {"where_values", json{
-                                     {"ref", struct_certs.ref}
-                                 }}
-                            };
-                            base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
-                            json param{
-                                {"destantion", base64_param},
-                                {"file_name", result.toStdString()}
-                            };
-                            resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::DownloadFile), param, ba);
-                            if(resp  != "error"){
-                                auto query_param = nlohmann::json{
-                                    {"table_name", "Certificates"},
-                                    {"where_values", nlohmann::json{}},
-                                    {"query_type", "select"},
-                                    {"empty_column", false},
-                                    {"line_number", false},
-                                    {"values", json{
-                                            "first",
-                                            "ref",
-                                            "private_key",
-                                            "subject",
-                                            "issuer",
-                                            "not_valid_before",
-                                            "not_valid_after",
-                                            "parent_user",
-                                            "serial",
-                                            "sha1",
-                                            "cache"
-                                        }
-                                    }
-                                };
-                                m_client->send_command(arcirk::server::server_commands::ExecuteSqlQuery, nlohmann::json{
-                                                           {"query_param", QByteArray(query_param.dump().data()).toBase64().toStdString()}
-                                                       });
-                            }
-                        }
-                    }
-                }
-            } catch (const std::exception& e) {
-                QMessageBox::critical(this, "Ошибка", e.what());
-                return;
-            }
-
-        }
+        database_insert_certificate();
     }else if(model->server_object() == arcirk::server::Containers){
 
         using namespace arcirk::cryptography;
@@ -1803,6 +1895,51 @@ void MainWindow::on_btnAdd_clicked()
             add_cert_user(parent_struct);
         }else
             QMessageBox::critical(this, "Ошибка", "Выберете группу!");
+    }else if(model->server_object() == arcirk::server::server_objects::Devices){
+        auto object = arcirk::database::table_default_json(arcirk::database::tbDevices);
+        auto resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::DeviceGetFullInfo), json{});
+        resp["device"] = object;
+        auto dlg = DialogDevice(resp, this);
+        dlg.setModal(true);
+        dlg.exec();
+        if(dlg.result() == QDialog::Accepted){
+            auto dev = dlg.get_result();
+            nlohmann::json query_param = {
+                {"table_name", "Devices"},
+                {"query_type", "insert"},
+                {"values", pre::json::to_json(dev)}
+            };
+
+            std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+            resp = m_client->exec_http_query(arcirk::enum_synonym(server_commands::ExecuteSqlQuery), json{
+                                                 {"query_param", base64_param}
+                                             });
+            if(resp.is_string()){
+                if(resp.get<std::string>() == WS_RESULT_SUCCESS){
+                    model->add(pre::json::to_json(dlg.get_view_result()));
+                    update_icons(server_objects::Devices, model);
+                }
+            }
+            update_icons(arcirk::server::Devices, model);
+        }
+    }else if(model->server_object() == arcirk::server::server_objects::LocalhostUserCertificates){
+
+        auto dlg_sel = DialogSelect(this);
+        dlg_sel.setModal(true);
+        dlg_sel.exec();
+        if(dlg_sel.result() == QDialog::Accepted){
+            auto result = dlg_sel.get_result();
+            if(result == 0){
+                auto file_name = QFileDialog::getOpenFileName(this, "Выбрать файл на диске", "", tr("Файлы сетрификатов (*.cer *.crt)"));
+                auto cert = CryptCertificate(this);
+                cert.fromFile(file_name);
+                if(cert.isValid()){
+
+                }
+            }else if(result == 1){
+
+            }
+        }
     }
 }
 
@@ -1964,6 +2101,31 @@ void MainWindow::on_btnSetLinkDevice_clicked()
                     {"device_id", ref.toStdString()}
             };
             m_client->send_command(arcirk::server::server_commands::SetNewDeviceId, param);
+        }
+    }else if(model->server_object() == arcirk::server::Certificates){
+        database_get_containers_synch();
+        auto dlg = DialogSelectInList(m_models[Containers], "Выбор контейнера", this);
+        dlg.setModal(true);
+        dlg.exec();
+        if(dlg.result() == QDialog::Accepted){
+            auto res = dlg.dialogResult();
+            auto ind = m_models[Containers]->get_column_index("ref");
+            auto ref = res[ind];
+            auto query_param = nlohmann::json{
+                {"table_name", arcirk::enum_synonym(arcirk::database::tables::tbCertificates)},
+                {"where_values", nlohmann::json{
+                        {"ref", m_models[Containers]->get_object(index)["ref"]}
+                    }
+                },
+                {"query_type", "update"},
+                {"values", nlohmann::json{
+                        {"private_key", ref.toStdString()}
+                    }
+                }
+            };
+            m_client->send_command(arcirk::server::server_commands::ExecuteSqlQuery, nlohmann::json{
+                                       {"query_param", QByteArray(query_param.dump().data()).toBase64().toStdString()}
+                                   });
         }
     }
 }

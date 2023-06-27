@@ -107,6 +107,10 @@ nlohmann::json CommandLineParser::parse(const QString &response, CmdCommand comm
                             //arr += obj;
                             return obj;
                         }
+                    }else{
+                        if(s.length() == QString("-dump — команда успешно выполнена.").length()){
+                            qCritical() << __FUNCTION__ << "Ошибка парсинга" << "Возможно проблемы с кодировкой.";
+                        }
                     }
                 }
             }
@@ -176,6 +180,9 @@ nlohmann::json CommandLineParser::parse(const QString &response, CmdCommand comm
                 QString tmp(response);
                 int l = tmp.indexOf("\\\\.\\");
                 int e = tmp.lastIndexOf("OK.");
+
+                if(l==-1 || e==-1)
+                    return {};
 
                 auto obj = nlohmann::json::object();
                 obj["columns"] = json{

@@ -2,6 +2,7 @@
 #include "ui_dialogdevice.h"
 #include <QStringListModel>
 #include <QComboBox>
+#include <QUuid>
 
 DialogDevice::DialogDevice(const nlohmann::json& deviceDetails, QWidget *parent) :
     QDialog(parent),
@@ -60,6 +61,10 @@ DialogDevice::DialogDevice(const nlohmann::json& deviceDetails, QWidget *parent)
     ui->edtSecond->setText( result_.second.c_str());
     ui->edtRef->setText( result_.ref.c_str());
     ui->txtAddress->setText(result_.address.c_str());
+
+    if(ui->edtRef->text().toStdString() == arcirk::uuids::nil_string_uuid()){
+        ui->editRef->setEnabled(true);
+    }
 }
 
 DialogDevice::~DialogDevice()
@@ -110,3 +115,21 @@ QString DialogDevice::key(const std::string& value, QMap<std::string, std::strin
     }
     return {};
 }
+
+
+
+void DialogDevice::on_editRef_toggled(bool checked)
+{
+    ui->edtRef->setEnabled(checked);
+    if(ui->edtRef->text().toStdString() == arcirk::uuids::nil_string_uuid()){
+        ui->edtRef->setText(QUuid::createUuid().toString(QUuid::WithoutBraces));
+        result_.ref = ui->edtRef->text().toStdString();
+    }
+}
+
+
+void DialogDevice::on_edtRef_editingFinished()
+{
+    result_.ref = ui->editRef->text().toStdString();
+}
+

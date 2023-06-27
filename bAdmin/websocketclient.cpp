@@ -355,7 +355,7 @@ nlohmann::json WebSocketClient::exec_http_query(const std::string &command, cons
     if(httpData.isEmpty())
         return false;
 
-    if(httpData == "error"){
+    if(httpData == WS_RESULT_ERROR){
          return false;
     }
 
@@ -365,16 +365,19 @@ nlohmann::json WebSocketClient::exec_http_query(const std::string &command, cons
         return {};
 
     try {
-        if(msg.result != "error"){
-            auto http_result = nlohmann::json::parse(QByteArray::fromBase64(msg.result.data()).toStdString());
-            return http_result;
+        if(msg.result != WS_RESULT_ERROR){
+            if(msg.result != WS_RESULT_SUCCESS){
+                auto http_result = nlohmann::json::parse(QByteArray::fromBase64(msg.result.data()).toStdString());
+                return http_result;
+            }else
+                return WS_RESULT_SUCCESS;
         }else{
             emit error(__FUNCTION__, msg.command.c_str(), msg.message.c_str());
-            return "error";
+            return WS_RESULT_ERROR;
         }
     } catch (const std::exception& e) {
         emit error(__FUNCTION__, msg.command.c_str(), e.what());
-        return "error";
+        return WS_RESULT_ERROR;
     }
 
 }
@@ -442,7 +445,7 @@ nlohmann::json WebSocketClient::http_query(const QUrl &ws, const QString &token,
     if(httpData.isEmpty())
         return false;
 
-    if(httpData == "error"){
+    if(httpData == WS_RESULT_ERROR){
          return false;
     }
 
@@ -515,7 +518,7 @@ QByteArray WebSocketClient::exec_http_query_get(const std::string &command, cons
     if(httpData.isEmpty())
         return {};
 
-    if(httpData == "error"){
+    if(httpData == WS_RESULT_ERROR){
         return {};
     }
 

@@ -26,6 +26,7 @@ SOURCES += \
     dialoginfo.cpp \
     dialogmplitem.cpp \
     dialogmstsc.cpp \
+    dialogselect.cpp \
     dialogselectdevice.cpp \
     dialogselectinlist.cpp \
     connectiondialog.cpp \
@@ -58,6 +59,7 @@ HEADERS += \
     dialoginfo.h \
     dialogmplitem.h \
     dialogmstsc.h \
+    dialogselect.h \
     dialogselectdevice.h \
     dialogselectinlist.h \
     connectiondialog.h \
@@ -85,6 +87,7 @@ FORMS += \
     dialoginfo.ui \
     dialogmplitem.ui \
     dialogmstsc.ui \
+    dialogselect.ui \
     dialogselectdevice.ui \
     dialogselectinlist.ui \
     connectiondialog.ui \

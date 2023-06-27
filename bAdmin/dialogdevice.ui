@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>472</width>
-    <height>344</height>
+    <height>346</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,28 +16,8 @@
   <layout class="QGridLayout" name="gridLayout_2">
    <item row="0" column="0">
     <layout class="QGridLayout" name="gridLayout">
-     <item row="1" column="1">
-      <widget class="QLineEdit" name="edtRef">
-       <property name="enabled">
-        <bool>false</bool>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="1">
-      <widget class="QLineEdit" name="edtFirst"/>
-     </item>
-     <item row="7" column="0">
-      <widget class="QLabel" name="label_9">
-       <property name="text">
-        <string>Рабочее место:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="5" column="1">
+     <item row="5" column="4">
       <widget class="QComboBox" name="cmbSubdivisions"/>
-     </item>
-     <item row="6" column="1">
-      <widget class="QComboBox" name="cmbWarehouses"/>
      </item>
      <item row="0" column="0">
       <widget class="QLabel" name="label">
@@ -46,8 +26,19 @@
        </property>
       </widget>
      </item>
-     <item row="3" column="1">
-      <widget class="QLineEdit" name="edtSecond"/>
+     <item row="7" column="0">
+      <widget class="QLabel" name="label_9">
+       <property name="text">
+        <string>Рабочее место:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="9" column="0">
+      <widget class="QLabel" name="label_10">
+       <property name="text">
+        <string>IP Адрес:</string>
+       </property>
+      </widget>
      </item>
      <item row="8" column="0">
       <widget class="QLabel" name="label_8">
@@ -56,22 +47,8 @@
        </property>
       </widget>
      </item>
-     <item row="0" column="1">
-      <widget class="QComboBox" name="cmbDeviceType"/>
-     </item>
-     <item row="2" column="0">
-      <widget class="QLabel" name="label_3">
-       <property name="text">
-        <string>Наименование:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="3" column="0">
-      <widget class="QLabel" name="label_4">
-       <property name="text">
-        <string>Наименование полное:</string>
-       </property>
-      </widget>
+     <item row="2" column="4">
+      <widget class="QLineEdit" name="edtFirst"/>
      </item>
      <item row="5" column="0">
       <widget class="QLabel" name="label_6">
@@ -80,8 +57,17 @@
        </property>
       </widget>
      </item>
-     <item row="8" column="1">
+     <item row="0" column="4">
+      <widget class="QComboBox" name="cmbDeviceType"/>
+     </item>
+     <item row="8" column="4">
       <widget class="QComboBox" name="cmbTypePrice"/>
+     </item>
+     <item row="7" column="4">
+      <widget class="QComboBox" name="cmbWorkplaces"/>
+     </item>
+     <item row="3" column="4">
+      <widget class="QLineEdit" name="edtSecond"/>
      </item>
      <item row="4" column="0">
       <widget class="QLabel" name="label_5">
@@ -104,21 +90,56 @@
        </property>
       </widget>
      </item>
-     <item row="4" column="1">
+     <item row="9" column="4">
+      <widget class="QLineEdit" name="txtAddress"/>
+     </item>
+     <item row="6" column="4">
+      <widget class="QComboBox" name="cmbWarehouses"/>
+     </item>
+     <item row="4" column="4">
       <widget class="QComboBox" name="cmbOrganisation"/>
      </item>
-     <item row="7" column="1">
-      <widget class="QComboBox" name="cmbWorkplaces"/>
-     </item>
-     <item row="9" column="0">
-      <widget class="QLabel" name="label_10">
+     <item row="3" column="0">
+      <widget class="QLabel" name="label_4">
        <property name="text">
-        <string>IP Адрес:</string>
+        <string>Наименование полное:</string>
        </property>
       </widget>
      </item>
-     <item row="9" column="1">
-      <widget class="QLineEdit" name="txtAddress"/>
+     <item row="2" column="0">
+      <widget class="QLabel" name="label_3">
+       <property name="text">
+        <string>Наименование:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="4">
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <item>
+        <widget class="QLineEdit" name="edtRef">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="editRef">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
+         <property name="text">
+          <string>...</string>
+         </property>
+         <property name="icon">
+          <iconset resource="resurses.qrc">
+           <normaloff>:/img/itemEdit.png</normaloff>:/img/itemEdit.png</iconset>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+      </layout>
      </item>
     </layout>
    </item>
@@ -134,7 +155,9 @@
    </item>
   </layout>
  </widget>
- <resources/>
+ <resources>
+  <include location="resurses.qrc"/>
+ </resources>
  <connections>
   <connection>
    <sender>buttonBox</sender>

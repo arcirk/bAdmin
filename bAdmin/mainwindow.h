@@ -109,6 +109,19 @@ private:
     QAction         *quitAction;
     QAction         *showAction;
 
+    QMap<arcirk::server::server_objects,
+    QVector<QString>>   m_order_columns{
+        qMakePair(arcirk::server::server_objects::Certificates, QVector<QString>{
+                    "first", "subject", "issuer", "not_valid_before", "not_valid_after", "private_key", "parent_user"
+                }),
+        qMakePair(arcirk::server::server_objects::Containers, QVector<QString>{
+                    "first", "subject", "issuer", "not_valid_before", "not_valid_after", "parent_user"
+                }),
+        qMakePair(arcirk::server::server_objects::OnlineUsers, QVector<QString>{
+                    "app_name", "host_name", "address", "user_name", "role", "start_date", "session_uuid", "user_uuid", "device_id"
+                }),
+    };
+
     void createModels();
     void createColumnAliases();
     bool openConnectionDialog();
@@ -157,6 +170,12 @@ private:
     QString cache_mstsc_directory();
     void update_rdp_files(const nlohmann::json& data);
 
+    void database_get_containers_synch();
+    void database_get_containers_asynch();
+    void database_get_certificates_asynch();
+    void database_get_deviceview_asynch();
+
+    void database_insert_certificate();
 signals:
     void setConnectionChanged(bool state);
     void certUserData(const QString& host, const QString& system_user, const nlohmann::json& data);
@@ -182,6 +201,7 @@ public slots:
 
     void onTreeFetch();
 
+    void wsError(const QString& what, const QString& command, const QString& err);
 
 
 };

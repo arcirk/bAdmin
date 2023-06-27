@@ -549,10 +549,15 @@ void TreeViewModel::fetchMore(const QModelIndex &parent)
 
 void TreeViewModel::set_table(const nlohmann::json& tableModel){
 
+    beginResetModel();
     clear();
     columns.clear();
 
-    Q_ASSERT(tableModel.is_object());
+    //Q_ASSERT(tableModel.is_object());
+    if(!tableModel.is_object()){
+        return;
+        endResetModel();
+    }
 
     auto cols = tableModel["columns"];
     if(cols.is_array()){
@@ -560,7 +565,6 @@ void TreeViewModel::set_table(const nlohmann::json& tableModel){
             columns.push_back(QString::fromStdString(*itr));
         }
     }
-    beginResetModel();
     auto rows = tableModel["rows"];
     if(rows.is_array()){
         for(auto entry = rows.begin(); entry != rows.end(); ++entry) {

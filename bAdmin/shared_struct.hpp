@@ -33,6 +33,9 @@
 
 #define APP_NAME "bAdmin"
 
+#define WS_RESULT_SUCCESS "success"
+#define WS_RESULT_ERROR "error"
+
 typedef unsigned char BYTE;
 typedef std::vector<BYTE> ByteArray;
 
