@@ -8,6 +8,8 @@
 #include "commandlineparser.h"
 #include <QUrl>
 #include <QTemporaryFile>
+#include <QDateTime>
+#include <QTimeZone>
 
 bool CryptCertificate::isValid()
 {
@@ -145,6 +147,7 @@ bool CryptCertificate::fromFile(const QString &path)
         arcirk::read_file(QTextCodec::codecForName("CP1251")->fromUnicode(path_).toStdString(), cert_info_.data);
     } catch (const std::exception& e) {
         qCritical() << e.what();
+        return false;
     }
 
 //    if(tmp.isWritable()){
@@ -229,10 +232,11 @@ std::string CryptCertificate::dump() const
 
 void CryptCertificate::load_response(arcirk::database::certificates& result, const nlohmann::json& object)
 {
-    //result.first = object.value()
-    result.issuer = object.value("Issuer", "");
-    if(!result.issuer.empty()){
-        QString issuer(result.issuer.c_str());
+
+    //result.issuer = object.value("Issuer", "");
+    auto all_issuer = object.value("Issuer", "");
+    if(!all_issuer.empty()){
+        QString issuer(all_issuer.c_str());
         auto lst = issuer.split(",");
         QMap<QString,QString> m_lst;
         foreach(auto str, lst){
@@ -247,12 +251,14 @@ void CryptCertificate::load_response(arcirk::database::certificates& result, con
             }
         }
 
-        result.first = m_lst["CN"].toStdString();
+        //result.first = m_lst["CN"].toStdString();
+        result.issuer = m_lst["CN"].toStdString();
     }
-    result.subject = object.value("Subject", "");
-    if(!result.issuer.empty()){
-        QString issuer(result.issuer.c_str());
-        auto lst = issuer.split(",");
+    //result.subject = object.value("Subject", "");
+    auto all_subject = object.value("Subject", "");
+    if(!all_subject.empty()){
+        QString subject(all_subject.c_str());
+        auto lst = subject.split(",");
         QMap<QString,QString> m_lst;
         foreach(auto str, lst){
             if(str.indexOf("=") !=-1){
@@ -260,8 +266,11 @@ void CryptCertificate::load_response(arcirk::database::certificates& result, con
                 m_lst.insert(ind[0].trimmed(), ind[1].trimmed());
             }
         }
-        result.second = m_lst["CN"].toStdString();
+        auto s = m_lst["CN"];
+        s.remove("\"");
+        result.second = s.toStdString();
         result.parent_user = m_lst["SN"].toStdString() + " " + m_lst["G"].toStdString();
+        result.subject = result.second;
     }
     result.private_key = object.value("Container", "");
     result.not_valid_before = object.value("Not valid before", "");
@@ -269,6 +278,25 @@ void CryptCertificate::load_response(arcirk::database::certificates& result, con
     result.serial = object.value("Serial", "");
     result.sha1 = object.value("SHA1 Hash", "");
     result.cache = object.dump();
+
+    std::string pres = result.subject;
+    pres.append(" ");
+    auto dt_str = QString(result.not_valid_before.c_str()).remove(" UTC");
+    auto dt = QDateTime::fromString(dt_str, "dd/MM/yyyy  hh:mm:ss");
+    if(dt.isValid())
+        pres.append(dt.toString("dd.MM.yyyy").toStdString());
+    else
+        pres.append(result.not_valid_before);
+
+    pres.append("-");
+    dt_str = QString(result.not_valid_after.c_str()).remove(" UTC");
+    dt = QDateTime::fromString(dt_str, "dd/MM/yyyy  hh:mm:ss");
+    if(dt.isValid())
+        pres.append(dt.toString("dd.MM.yyyy").toStdString());
+    else
+        pres.append(result.not_valid_after);
+
+    result.first = pres;
 }
 
 bool CryptCertificate::save_as(const QString &sha1, const QString &file, QObject* parent)
@@ -355,6 +383,120 @@ QString CryptCertificate::get_crypto_pro_dir()
        return "";
     else
         return result.path();
+}
+
+bool CryptCertificate::install(const QString &container, QObject *parent)
+{
+    if(!is_valid)
+        return false;
+
+    if(cert_info_.data.size() == 0)
+        return false;
+
+    using json = nlohmann::json;
+
+    auto cmd = CommandLine(parent);
+    QString cryptoPro = get_crypto_pro_dir();
+    Q_ASSERT(!cryptoPro.isEmpty());
+    cmd.setWorkingDirectory(cryptoPro);
+
+    auto tmp = new QTemporaryFile();
+    tmp->setAutoRemove(false);
+    tmp->open();
+    tmp->write(reinterpret_cast<const char*>(cert_info_.data.data()), cert_info_.data.size());
+    tmp->close();
+
+    auto temp_file = QDir::toNativeSeparators(tmp->fileName());
+    delete tmp;
+
+
+    QEventLoop loop;
+    auto sha1 = cert_info_.sha1;
+
+    bool result = true;
+
+    auto started = [&cmd, &temp_file, &container]() -> void
+    {
+        QString command;
+        if(container.isEmpty())
+            command = QString("certmgr -inst -file \"%1\" & exit").arg(temp_file);
+        else
+            command = QString("certmgr -inst -file \"%1\" -cont \"%2\" & exit").arg(temp_file, container);
+
+        qDebug() << command;
+        cmd.send(command, CmdCommand::certmgrInstallCert);
+    };
+    loop.connect(&cmd, &CommandLine::started_process, started);
+
+    QByteArray cmd_text;
+    auto output = [&cmd_text](const QByteArray& data) -> void
+    {
+        cmd_text.append(data);
+    };
+    loop.connect(&cmd, &CommandLine::output, output);
+    auto err = [&loop, &cmd, &result](const QString& data, int command) -> void
+    {
+        qDebug() << __FUNCTION__ << data << command;
+        result = false;
+        cmd.stop();
+        loop.quit();
+    };
+    loop.connect(&cmd, &CommandLine::error, err);
+
+    auto state = [&loop]() -> void
+    {
+        loop.quit();
+    };
+    loop.connect(&cmd, &CommandLine::complete, state);
+
+    cmd.start();
+    loop.exec();
+
+    return result;
+
+}
+
+void CryptCertificate::remove(const QString &sha1, QObject *parent)
+{
+
+    using json = nlohmann::json;
+
+    auto cmd = CommandLine(parent);
+    QString cryptoPro = get_crypto_pro_dir();
+    Q_ASSERT(!cryptoPro.isEmpty());
+    cmd.setWorkingDirectory(cryptoPro);
+
+    QEventLoop loop;
+
+    auto started = [&cmd, &sha1]() -> void
+    {
+        QString command = QString("certmgr -delete -thumbprint \"%1\" & exit").arg(sha1);;
+        cmd.send(command, CmdCommand::certmgrDeletelCert);
+    };
+    loop.connect(&cmd, &CommandLine::started_process, started);
+
+    QByteArray cmd_text;
+    auto output = [&cmd_text](const QByteArray& data) -> void
+    {
+        cmd_text.append(data);
+    };
+    loop.connect(&cmd, &CommandLine::output, output);
+    auto err = [&loop, &cmd](const QString& data, int command) -> void
+    {
+        qDebug() << __FUNCTION__ << data << command;
+        cmd.stop();
+        loop.quit();
+    };
+    loop.connect(&cmd, &CommandLine::error, err);
+
+    auto state = [&loop]() -> void
+    {
+        loop.quit();
+    };
+    loop.connect(&cmd, &CommandLine::complete, state);
+
+    cmd.start();
+    loop.exec();
 }
 
 nlohmann::json CryptCertificate::parse_details(const std::string &details) const

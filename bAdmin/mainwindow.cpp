@@ -1934,7 +1934,33 @@ void MainWindow::on_btnAdd_clicked()
                 auto cert = CryptCertificate(this);
                 cert.fromFile(file_name);
                 if(cert.isValid()){
+                    auto conts = current_user->getContainers();
+                    if(conts.is_object() && !conts.empty()){
+                        resetModel(arcirk::server::LocalhostUserContainers, conts);
+                    }
+                    auto dlg = DialogSelectInTree(m_models[arcirk::server::server_objects::LocalhostUserContainers], this);
+                    dlg.setModal(true);
+                    dlg.set_window_text("Выбор контейнера");
+                    dlg.exec();
+                    if(dlg.result() == QDialog::Accepted){
+                        auto cnt = dlg.selectedObject();
+                        qDebug() << cnt.dump().c_str();
+                        auto volume = cnt.value("volume", "");
+                        std::string cnt_str;
+                        if(!volume.empty())
+                            cnt_str = volume + cnt.value("name", "");
 
+                        auto res =cert.install(cnt_str.c_str(), this);
+                        if(res)
+                            trayShowMessage("Сертификат успешно установлен!");
+                        else
+                            displayError("Ошибка", "Ошибка установки сертификата!");
+
+                        auto certs = current_user->getCertificates(true);
+                        if(certs.is_object() && !certs.empty()){
+                            resetModel(arcirk::server::LocalhostUserCertificates, certs);
+                        }
+                    }
                 }
             }else if(result == 1){
 
@@ -1949,7 +1975,7 @@ void MainWindow::on_btnDelete_clicked()
     auto model = (TreeViewModel*)ui->treeView->model();
     auto index = ui->treeView->currentIndex();
     if(!index.isValid()){
-        QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
+        QMessageBox::critical(this, "Ошибка", "Не выбрана строка!");
         return;
     }
 
@@ -2074,7 +2100,19 @@ void MainWindow::on_btnDelete_clicked()
             model->remove(index);
 
         }
+    }else if(model->server_object() == server_objects::LocalhostUserCertificates){
+        auto object = model->get_object(index);
+        std::string name = object["first"];
+
+        if(QMessageBox::question(this, "Удаление сертификата", QString("Удалить сертификат %1?").arg(name.c_str())) == QMessageBox::No)
+            return;
+        auto cert = CryptCertificate(this);
+        cert.remove(object["sha1"].get<std::string>().c_str(), this);
+        auto certs = current_user->getCertificates(true);
+        if(certs.is_object() && !certs.empty())
+            resetModel(LocalhostUserCertificates, certs);
     }
+
 }
 void MainWindow::on_btnSetLinkDevice_clicked()
 {

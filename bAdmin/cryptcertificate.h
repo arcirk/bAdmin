@@ -18,6 +18,9 @@ public:
     void fromLocal(const QString &sha);
     bool fromFile(const QString &path);
 
+    bool install(const QString& container = "", QObject *parent = nullptr);
+    void remove(const QString &sha1, QObject *parent = nullptr);
+
     cert_info getData() const;
 
     nlohmann::json issuer() const;
@@ -33,6 +36,7 @@ public:
 
     static bool save_as(const QString& sha1, const QString& file, QObject *parent);
     static QString get_crypto_pro_dir();
+
 
 private:
     arcirk::database::certificates cert_struct;

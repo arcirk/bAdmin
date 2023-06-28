@@ -1063,6 +1063,7 @@ BOOST_FUSION_DEFINE_STRUCT(
     (std::string, sha1)
     (std::string, suffix)
     (std::string, cache)
+    (std::string, private_key)
 )
 
 BOOST_FUSION_DEFINE_STRUCT(
