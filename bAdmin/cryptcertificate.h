@@ -17,6 +17,7 @@ public:
 
     void fromLocal(const QString &sha);
     bool fromFile(const QString &path);
+    bool fromByteArray(const QByteArray& data);
 
     bool install(const QString& container = "", QObject *parent = nullptr);
     void remove(const QString &sha1, QObject *parent = nullptr);

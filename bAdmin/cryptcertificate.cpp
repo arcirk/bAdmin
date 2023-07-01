@@ -159,6 +159,23 @@ bool CryptCertificate::fromFile(const QString &path)
 
 }
 
+bool CryptCertificate::fromByteArray(const QByteArray &data)
+{
+    is_valid = false;
+    if(data.isEmpty())
+        return false;
+
+    auto tmp_file = new QTemporaryFile();
+    tmp_file->setAutoRemove(false);
+    tmp_file->open();
+    tmp_file->write(data);
+    tmp_file->close();
+    auto file_name = tmp_file->fileName();
+    delete tmp_file;
+
+    return fromFile(file_name);
+}
+
 cert_info CryptCertificate::getData() const
 {
     return cert_info_;

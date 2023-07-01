@@ -21,6 +21,7 @@ public:
     QString user_name();
 
     win_user_info getInfo() const;
+    //static win_user_info get_win_user_info();
 
     nlohmann::json getCertificates(bool brief);
 

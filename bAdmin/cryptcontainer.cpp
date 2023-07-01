@@ -9,6 +9,7 @@
 #include <QTemporaryFile>
 #include <stdio.h>
 #include "winreg/WinReg.hpp"
+#include <QSettings>
 
 #ifdef _WINDOWS
     #pragma warning(disable:4100)
@@ -20,6 +21,7 @@ CryptContainer::CryptContainer(QObject *parent)
     is_valid = false;
     original_name_ = "";
     //cnt_data_ = std::make_shared<arcirk::cryptography::cont_info>();
+    //get_sid();
 }
 
 void CryptContainer::erase()
@@ -161,6 +163,45 @@ void CryptContainer::from_registry(const QString &sid, const QString &name)
     is_valid = true;
 }
 
+bool CryptContainer::to_registry(const QString &sid, const QString &name)
+{
+    QString sid__ = sid.isEmpty() ? user_info_.sid.c_str() : sid;
+    QString name__ = name.isEmpty() ? original_name_ : name;
+
+    if(!isValid()){
+        qCritical() << __FUNCTION__ << "класс не инициализирован!";
+        return false;
+    }
+
+    if(sid__.isEmpty()){
+        qCritical() << __FUNCTION__ << "Требуется SID пользователя!";
+        return false;
+    }
+
+    if(name__.isEmpty()){
+        qCritical() << __FUNCTION__ << "Не указано имя контейнера!";
+        return false;
+    }
+
+    QString ph = QString("SOFTWARE\\WOW6432Node\\Crypto Pro\\Settings\\Users\\%1\\Keys\\%2").arg(sid__, name__);
+    winreg::RegKey regKey = winreg::CreateKey(HKEY_LOCAL_MACHINE, ph.toStdWString().c_str());
+
+    for(int i = 0; i < KeyFiles.size(); ++i){
+        QString key = KeyFiles[i];
+        auto funcGet = get_get_function(i);
+        ByteArray data;
+        funcGet(data);
+        if(data.size() == 0)
+            return false;
+        winreg::RegValue v(REG_BINARY);
+        foreach(auto bt, data){
+            v.Binary().push_back(bt);
+        }
+        SetValue(regKey.Get(), key.toStdWString().c_str(), v);
+    }
+    return true;
+}
+
 bool CryptContainer::to_file(const std::string &file)
 {
     Q_ASSERT(is_valid);
@@ -225,6 +266,99 @@ void CryptContainer::to_dir(const QString &dir)
                   data);
     }
     return;
+}
+
+void CryptContainer::from_data(char *data)
+{
+    auto tmp = new QTemporaryFile();
+    tmp->setAutoRemove(false);
+    tmp->open();
+    tmp->write(data);
+    auto file_name = tmp->fileName();
+    tmp->close();
+
+    from_file(file_name.toStdString());
+
+    auto f = QFile(file_name);
+    f.remove();
+}
+
+void CryptContainer::from_data(const QByteArray &data)
+{
+    auto tmp = new QTemporaryFile();
+    tmp->setAutoRemove(false);
+    tmp->open();
+    tmp->write(data);
+    auto file_name = tmp->fileName();
+    tmp->close();
+
+    from_file(file_name.toStdString());
+
+    auto f = QFile(file_name);
+    f.remove();
+}
+
+bool CryptContainer::delete_container_registry(const QString &sid, const QString &name)
+{
+    QString sid__ = sid.isEmpty() ? sid_ : sid;
+    QString name__ = name.isEmpty() ? original_name_ : name;
+
+    if(!isValid()){
+        qCritical() << __FUNCTION__ << "класс не инициализирован!";
+        return false;
+    }
+
+    if(sid__.isEmpty()){
+        qCritical() << __FUNCTION__ << "Требуется SID пользователя!";
+        return false;
+    }
+
+    if(name__.isEmpty()){
+        qCritical() << __FUNCTION__ << "Не указано имя контейнера!";
+        return false;
+    }
+
+    QString s_path = QString("\\HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Crypto Pro\\Settings\\Users\\%1\\Keys").arg(sid__);
+    QSettings reg = QSettings(s_path, QSettings::NativeFormat);
+    reg.beginGroup(name__);
+    reg.remove("");
+    reg.endGroup();
+    return true;
+}
+
+bool CryptContainer::install(const arcirk::cryptography::TypeOfStorgare& dest)
+{
+    using namespace arcirk::cryptography;
+    switch (dest) {
+    case storgareTypeRegistry:
+        return to_registry();
+    case storgareTypeLocalVolume:
+        break;
+    case storgareTypeDatabase:
+        break;
+    case storgareTypeRemoteBase:
+        break;
+    default:
+        break;
+    }
+}
+
+void CryptContainer::remove(const TypeOfStorgare &dest)
+{
+    using namespace arcirk::cryptography;
+    switch (dest) {
+    case storgareTypeRegistry:
+        to_registry();
+        break;
+    case storgareTypeLocalVolume:
+        break;
+    case storgareTypeDatabase:
+        break;
+    case storgareTypeRemoteBase:
+        break;
+    default:
+        break;
+    }
 }
 
 //char* CryptContainer::data()
@@ -318,7 +452,7 @@ bool CryptContainer::isValid()
     return is_valid;
 }
 
-void CryptContainer::get_sid()
+void CryptContainer::init_user_info()
 {
     using json = nlohmann::json;
 

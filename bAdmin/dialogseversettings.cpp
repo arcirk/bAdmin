@@ -51,6 +51,8 @@ DialogSeverSettings::DialogSeverSettings(arcirk::server::server_config& conf, ar
     ui->edtServerRepo->setText(conf_cl.server_repo.c_str());
     ui->chWriteLog->setCheckState(conf.WriteJournal == 0 ? Qt::CheckState::Unchecked : Qt::CheckState::Checked);
 
+    ui->chAllowIdentificationByWINSID->setChecked(conf.AllowIdentificationByWINSID);
+
     setWindowTitle(windowTitle() + QString("(%1").arg(conf.ServerName.c_str()));
 }
 
@@ -84,9 +86,11 @@ void DialogSeverSettings::accept()
         conf_.SQLPassword = WebSocketClient::crypt(ui->edtSQLPassword->text(), CRYPT_KEY); //crypt_utils().encrypt_string(ui->edtSQLPassword->text().toStdString()); //WebSocketClient::crypt( ui->edtSQLPassword->text(), "my_key");
     conf_.ExchangePlan = ui->edtExchangePlan->text().toStdString();
     conf_.WriteJournal = ui->chWriteLog->isChecked();
+    conf_.AllowIdentificationByWINSID = ui->chAllowIdentificationByWINSID->isChecked();
 
     conf_cl_.server_repo = ui->edtServerRepo->text().toStdString();
     conf_cl_.price_checker_repo = ui->edtPriceCheckerRepo->text().toStdString();
+
 
     QDialog::accept();
 }

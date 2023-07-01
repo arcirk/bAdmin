@@ -27,7 +27,7 @@
    <item row="0" column="0">
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="tab">
       <attribute name="title">
@@ -43,10 +43,20 @@
            </property>
           </widget>
          </item>
+         <item row="0" column="1">
+          <widget class="QLineEdit" name="edtServerName"/>
+         </item>
          <item row="6" column="1">
           <widget class="QCheckBox" name="chServerSsl">
            <property name="text">
             <string>SSL</string>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="0">
+          <widget class="QLabel" name="label_2">
+           <property name="text">
+            <string>Порт:</string>
            </property>
           </widget>
          </item>
@@ -73,6 +83,9 @@
            </property>
           </widget>
          </item>
+         <item row="5" column="1">
+          <widget class="QLineEdit" name="edtProfileDir"/>
+         </item>
          <item row="1" column="1">
           <widget class="QLineEdit" name="edtServerHost"/>
          </item>
@@ -83,14 +96,14 @@
            </property>
           </widget>
          </item>
-         <item row="8" column="1">
-          <widget class="QCheckBox" name="chAllowDelayedAuth">
+         <item row="9" column="1">
+          <widget class="QCheckBox" name="chWriteLog">
            <property name="text">
-            <string>Разрешить отложенную авторизацию</string>
+            <string>Вести журнал</string>
            </property>
           </widget>
          </item>
-         <item row="10" column="1">
+         <item row="11" column="1">
           <spacer name="verticalSpacer">
            <property name="orientation">
             <enum>Qt::Vertical</enum>
@@ -103,18 +116,12 @@
            </property>
           </spacer>
          </item>
-         <item row="4" column="0">
-          <widget class="QLabel" name="label_2">
+         <item row="8" column="1">
+          <widget class="QCheckBox" name="chAllowDelayedAuth">
            <property name="text">
-            <string>Порт:</string>
+            <string>Разрешить отложенную авторизацию</string>
            </property>
           </widget>
-         </item>
-         <item row="5" column="1">
-          <widget class="QLineEdit" name="edtProfileDir"/>
-         </item>
-         <item row="0" column="1">
-          <widget class="QLineEdit" name="edtServerName"/>
          </item>
          <item row="0" column="0">
           <widget class="QLabel" name="label_5">
@@ -123,10 +130,10 @@
            </property>
           </widget>
          </item>
-         <item row="9" column="1">
-          <widget class="QCheckBox" name="chWriteLog">
+         <item row="10" column="1">
+          <widget class="QCheckBox" name="chAllowIdentificationByWINSID">
            <property name="text">
-            <string>Вести журнал</string>
+            <string>Разрешить получение кэша настроек по Win SID</string>
            </property>
           </widget>
          </item>

@@ -173,6 +173,7 @@ private:
     void database_get_containers_synch();
     void database_get_containers_asynch();
     void database_get_certificates_asynch();
+    void database_get_certificates_synch();
     void database_get_deviceview_asynch();
 
     void database_insert_certificate();

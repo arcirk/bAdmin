@@ -27,6 +27,7 @@ DialogEditCertUser::DialogEditCertUser(arcirk::database::cert_users& source, con
     ui->chIsGroup->setCheckState(is_group == 0 ? Qt::Unchecked : Qt::Checked);
     ui->txtParent->setText(parent_name);
     ui->txtSystemUser->setText(source.system_user.c_str());
+    ui->txtSid->setText(source_.sid.c_str());
 
     formControl();
 
@@ -73,6 +74,7 @@ DialogEditCertUser::DialogEditCertUser(arcirk::database::cert_users &source, con
     ui->chIsGroup->setCheckState(is_group == 0 ? Qt::Unchecked : Qt::Checked);
     ui->txtParent->setText(parent_name);
     ui->txtSystemUser->setText(source.system_user.c_str());
+    ui->txtSid->setText(source_.sid.c_str());
 
     formControl();
 
@@ -107,6 +109,7 @@ void DialogEditCertUser::accept()
     source_.second = ui->txtSecond->text().trimmed().toStdString();
     source_.host = ui->cmbHosts->currentText().toStdString();
     source_.system_user = ui->txtSystemUser->text().toStdString();
+    source_.sid = ui->txtSid->text().toStdString();
 
     QDialog::accept();
 }

@@ -37,12 +37,19 @@ public:
     static QString get_local_volume(const QString& path);
 
     void from_registry(const QString& sid, const QString& name);
+    bool to_registry(const QString& sid = "", const QString& name = "");
     void from_dir(const QString& folder);
     bool to_file(const std::string& file);
     void from_file(const std::string& file);
     void to_dir(const QString& dir);
     void from_data(char* data);
-    //char* data();
+    void from_data(const QByteArray& data);
+
+    bool delete_container_registry(const QString& sid = "", const QString& name = "");
+
+    bool install(const TypeOfStorgare& dest);
+    void remove(const TypeOfStorgare& dest);
+
     ByteArray to_byate_array();
 
     nlohmann::json info(const QString& container_name);
@@ -51,6 +58,8 @@ public:
     QString get_volume() const;
 
     bool isValid();
+
+    void init_user_info();
 
 private:
     QString sid_;
@@ -67,7 +76,7 @@ private:
     ByteArray _primary_key;
     ByteArray _primary2_key;
 
-    void get_sid();
+
     std::map<std::string, set_keys> set_function();
     set_keys get_set_function(int index);
     get_keys get_get_function(int index);

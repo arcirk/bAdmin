@@ -59,6 +59,8 @@ void DialogCertUserCache::accept()
     cache["standard_password"] = ui->chkStandradPass->isChecked();
     cache["auto_connect"] = ui->chkAutoConnect->isChecked();
 
+    cache["use_sod"] = ui->chUseSid->isChecked();
+
     write_mstsc_param();
     write_mpl_options();
     write_crypt_data();
