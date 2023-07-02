@@ -45,50 +45,26 @@ private slots:
     void trayShowMessage(const QString& msg, int isError = false);
 
     void on_mnuConnect_triggered();
-
     void on_mnuExit_triggered();
-
     void on_mnuDisconnect_triggered();
-
     void on_toolButton_clicked();
-
     void on_treeWidget_itemClicked(QTreeWidgetItem *item, int column);
-
     void on_btnEdit_clicked();
-
     void on_treeView_doubleClicked(const QModelIndex &index);
-
     void on_btnDataImport_clicked();
-
     void on_btnAdd_clicked();
-
     void on_btnDelete_clicked();
-
     void on_btnSetLinkDevice_clicked();
-
     void on_mnuAbout_triggered();
-
     void on_mnuOptions_triggered();
-
     void on_btnTaskRestart_clicked();
-
     void on_btnStartTask_clicked();
-
     void on_btnSendClientRelease_clicked();
-
     void on_btnSendoToClient_clicked();
-
     void on_btnInfo_clicked();
-
     void on_btnAddGroup_clicked();
-
     void on_btnRegistryDevice_clicked();
-
-    //void onShowMenu();
-
     void on_btnRegistryUser_clicked();
-
-
     void on_btnEditCache_clicked();
 
 private:
@@ -177,6 +153,8 @@ private:
     void database_get_deviceview_asynch();
 
     void database_insert_certificate();
+
+    void set_enable_form(bool value);
 signals:
     void setConnectionChanged(bool state);
     void certUserData(const QString& host, const QString& system_user, const nlohmann::json& data);

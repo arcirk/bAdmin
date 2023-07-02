@@ -59,7 +59,7 @@ void DialogCertUserCache::accept()
     cache["standard_password"] = ui->chkStandradPass->isChecked();
     cache["auto_connect"] = ui->chkAutoConnect->isChecked();
 
-    cache["use_sod"] = ui->chUseSid->isChecked();
+    cache["use_sid"] = ui->chUseSid->isChecked();
 
     write_mstsc_param();
     write_mpl_options();
@@ -379,6 +379,7 @@ void DialogCertUserCache::read_cache(const nlohmann::json &data)
     ui->chkStandradPass->setCheckState(cache.value("standard_password", true) ? Qt::Checked : Qt::Unchecked);
     ui->chkAutoConnect->setCheckState(cache.value("auto_connect", true) ? Qt::Checked : Qt::Unchecked);
     ui->txtServerUser->setText(cli_param.user_name.c_str());
+    ui->chUseSid->setChecked(cache.value("use_sid", true));
 
     read_mpl_options();
 
@@ -917,5 +918,11 @@ void DialogCertUserCache::on_btnMstscRemove_clicked()
 
     auto model = (TreeViewModel*)ui->treeViewMstsc->model();
     model->remove(index);
+}
+
+
+void DialogCertUserCache::on_btnMstsc_clicked()
+{
+
 }
 

@@ -54,14 +54,14 @@ MainWindow::MainWindow(QWidget *parent)
 
     m_client->set_system_user(current_user->user_name());
 
+    formControl();
+
     if(!m_client->conf().is_auto_connect)
         openConnectionDialog();
     else
         reconnect();
 
     createColumnAliases();
-
-    formControl();
 
     fillDefaultTree();
 
@@ -112,6 +112,9 @@ void MainWindow::reconnect()
             m_client->close();
 
     m_client->open();
+    infoBar->setText("Попытка подключения ...");
+    set_enable_form(false);
+    ui->toolBar->setEnabled(false);
 }
 
 void MainWindow::displayError(const QString &what, const QString &err)
@@ -143,10 +146,13 @@ void MainWindow::connectionSuccess()
     trayShowMessage(QString("Успешное подключение к севрверу: %1:%2").arg(m_client->server_conf().ServerHost.c_str(), QString::number(m_client->server_conf().ServerPort)));
 
     createDynamicMenu();
+
+    //ui->toolBar->setEnabled(true);
 }
 
 void MainWindow::connectionChanged(bool state)
 {
+    ui->toolBar->setEnabled(true);
     ui->mnuConnect->setEnabled(!state);
     ui->mnuDisconnect->setEnabled(state);
 
@@ -164,6 +170,8 @@ void MainWindow::connectionChanged(bool state)
          tree->topLevelItem(0)->setText(0, QString("%1 (%2)").arg(m_client->conf().server_host.c_str(), m_client->server_conf().ServerName.c_str()));
 
     }
+
+    set_enable_form(state);
 }
 
 
@@ -176,6 +184,7 @@ void MainWindow::formControl()
     app_icons.insert(arcirk::server::application_names::PriceChecker, qMakePair(QIcon(":/img/pricechecker.png"), QIcon(":/img/pricechecker.png")));
     app_icons.insert(arcirk::server::application_names::ServerManager, qMakePair(QIcon(":/img/socket.ico"), QIcon(":/img/socket.ico")));
     app_icons.insert(arcirk::server::application_names::ExtendedLib, qMakePair(QIcon(":/img/1cv8.png"), QIcon(":/img/1cv8.png")));
+    app_icons.insert(arcirk::server::application_names::ProfileManager, qMakePair(QIcon(":/img/mpl.png"), QIcon(":/img/mpl.png")));
 
 }
 
@@ -243,7 +252,10 @@ void MainWindow::serverResponse(const arcirk::server::server_response &message)
         if(message.message == "OK"){
             tableResetModel(arcirk::server::Services, message.result.data());
         }
+    }else if(message.command == "ClientLeave" || message.command == "ClientJoin"){
+        get_online_users();
     }
+
 }
 
 void MainWindow::onCertUserCache(const QUrl &ws, const QString &host, const QString &system_user, QWidget *parent)
@@ -962,6 +974,13 @@ void MainWindow::database_insert_certificate()
     }
 }
 
+void MainWindow::set_enable_form(bool value)
+{
+    ui->treeView->setEnabled(value);
+    ui->treeWidget->setEnabled(value);
+    ui->widgetToolBar->setEnabled(value);
+}
+
 void MainWindow::database_get_certificates_asynch(){
     using namespace arcirk::server;
     if(m_client->isConnected()){
@@ -1310,6 +1329,8 @@ void MainWindow::update_icons(arcirk::server::server_objects key, TreeViewModel 
                 model->set_icon(model->index(i,0,parent), app_icons[ServerManager].first);
             }else if(type_app == ExtendedLib){
                 model->set_icon(model->index(i,0,parent), app_icons[ExtendedLib].first);
+            }else if(type_app == ProfileManager){
+                model->set_icon(model->index(i,0,parent), app_icons[ProfileManager].first);
             }
         }
     }else if(key == LocalhostUserCertificates || key == Certificates){

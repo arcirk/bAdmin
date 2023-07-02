@@ -452,6 +452,7 @@ namespace arcirk::server{
         PriceChecker,
         ServerManager,
         ExtendedLib,
+        ProfileManager,
         APP_INVALID=-1,
     };
 
@@ -460,6 +461,7 @@ namespace arcirk::server{
         {PriceChecker, "PriceChecker"} ,
         {ServerManager, "ServerManager"} ,
         {ExtendedLib, "ExtendedLib"} ,
+        {ProfileManager, "ProfileManager"} ,
     });
 
     enum device_types{
