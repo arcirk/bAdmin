@@ -3066,8 +3066,7 @@ void MainWindow::add_cert_user(const arcirk::database::cert_users &parent, const
         json query_param = {
             {"table_name", "CertUsers"},
             {"query_type", "insert"},
-            {"values", pre::json::to_json(struct_users)},
-            {"where_values", {}}
+            {"values", pre::json::to_json(struct_users)}
         };
         QString error_message;
         auto error = [&error_message](const QString& what, const QString& command, const QString& err) -> void

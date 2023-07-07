@@ -559,22 +559,17 @@ void TreeViewModel::set_table(const nlohmann::json& tableModel){
         endResetModel();
     }
 
-    //qDebug() << qPrintable(tableModel.dump().c_str());
+
     auto cols = tableModel.value("columns", nlohmann::json::array());
-    Q_ASSERT(cols.size() > 0);
-    if(cols.is_array()){
-        for (auto itr = cols.begin(); itr != cols.end(); ++itr) {
-            columns.push_back(QString::fromStdString(*itr));
-        }
+    for (auto itr = cols.begin(); itr != cols.end(); ++itr) {
+        columns.push_back(QString::fromStdString(*itr));
     }
-    auto rows = tableModel["rows"];
-    if(rows.is_array()){
-        for(auto entry = rows.begin(); entry != rows.end(); ++entry) {
-            nlohmann::json e = *entry;
-            NodeInfo nodeInfo(e);
-            nodeInfo.mapped = true;// e["is_group"] != 1;
-            _nodes.push_back(std::move(nodeInfo));
-        }
+    auto rows = tableModel.value("rows", nlohmann::json::array());
+    for(auto entry = rows.begin(); entry != rows.end(); ++entry) {
+        nlohmann::json e = *entry;
+        NodeInfo nodeInfo(e);
+        nodeInfo.mapped = true;// e["is_group"] != 1;
+        _nodes.push_back(std::move(nodeInfo));
     }
     endResetModel();
     is_loaded_ = true;
