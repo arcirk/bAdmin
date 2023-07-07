@@ -368,3 +368,56 @@ json CertUser::cache() const
 {
     return data_;
 }
+
+json CertUser::get_container_info(const QString &name)
+{
+    using json = nlohmann::json;
+
+    auto cryptoProLocation = getCryptoProCSP();
+
+    if(cryptoProLocation.isEmpty())
+        return {};
+
+    auto cmd = CommandLine(this);
+    cmd.setWorkingDirectory(cryptoProLocation);
+
+    QEventLoop loop;
+
+    auto started = [&cmd, name]() -> void
+    {
+        cmd.send(QString("csptest -keyset -container \"%1\" -info & exit").arg(name), CmdCommand::csptestContainerFnfo);
+    };
+    loop.connect(&cmd, &CommandLine::started_process, started);
+
+    json result{};
+    QByteArray cmd_text;
+    auto output = [&cmd_text](const QByteArray& data) -> void
+    {
+        cmd_text.append(data);
+    };
+    loop.connect(&cmd, &CommandLine::output, output);
+    auto err = [&loop, &cmd](const QString& data, int command) -> void
+    {
+        qDebug() << __FUNCTION__ << data << command;
+        cmd.stop();
+        loop.quit();
+    };
+    loop.connect(&cmd, &CommandLine::error, err);
+
+    auto state = [&loop]() -> void
+    {
+        loop.quit();
+    };
+    loop.connect(&cmd, &CommandLine::complete, state);
+
+    cmd.start();
+    loop.exec();
+
+   std::string result_ = arcirk::to_utf(cmd_text.toStdString(), "cp866");
+
+   qDebug() << __FUNCTION__ << qPrintable(result_.data());
+
+   auto info = CommandLineParser::parse(result_.c_str(), csptestContainerFnfo);
+
+   return info;
+}

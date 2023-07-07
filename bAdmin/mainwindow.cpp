@@ -217,11 +217,35 @@ void MainWindow::serverResponse(const arcirk::server::server_response &message)
         tableResetModel(arcirk::server::DatabaseTables, message.result.data());
     }else if(message.command == arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery)){
         if(message.result == WS_RESULT_ERROR){
-            qDebug() << __FUNCTION__ << "error result ExecuteSqlQuery";
-            return;
+            qCritical() << __FUNCTION__ << "error result ExecuteSqlQuery" << message.message.c_str();
         }else if(message.result == WS_RESULT_SUCCESS){
             qDebug() << __FUNCTION__ << "success result ExecuteSqlQuery";
-            return;
+            auto param = json::parse(QByteArray::fromBase64(message.param.c_str()));
+            if(!param.is_object())
+                return;
+            auto query_param_base64 = param.value("query_param", "");
+            if(query_param_base64.empty())
+                return;
+
+            auto query_param = json::parse(QByteArray::fromBase64(query_param_base64.c_str()));
+            auto query_type = query_param.value("query_type", "");
+            auto table_name = query_param.value("table_name", "");
+            if(table_name == arcirk::enum_synonym(arcirk::database::tables::tbCertUsers)){
+                if(query_type == "update"){
+                    auto values = query_param.value("values", json::object());
+                    if(!values.empty()){
+                        auto host = values.value("host", "");
+                        auto system_user = values.value("system_user", "");
+                        if(!host.empty() && !system_user.empty()){
+                            auto index = is_user_online(host.c_str(), system_user.c_str(), enum_synonym(server::application_names::ProfileManager).c_str());
+                            if(index.isValid()){
+                                auto session_info =arcirk::secure_serialization<client::session_info>( m_models[server::OnlineUsers]->get_object(index));
+                                m_client->command_to_client(session_info.session_uuid, "ResetCache", json{});
+                            }
+                        }
+                    }
+                }
+            }
         }else{
             auto param = nlohmann::json::parse(QByteArray::fromBase64(message.param.data()));
             auto query_param = param.value("query_param", "");
@@ -254,6 +278,24 @@ void MainWindow::serverResponse(const arcirk::server::server_response &message)
         }
     }else if(message.command == "ClientLeave" || message.command == "ClientJoin"){
         get_online_users();
+    }else if(message.command == "update_certUsers"){
+        auto param = nlohmann::json::parse(QByteArray::fromBase64(message.param.data()));
+        auto sid = param.value("sid", "");
+        auto host = param.value("host", "");
+        auto system_user = param.value("system_user", "");
+        auto model = (TreeViewModel*)ui->treeView->model();
+        if(model){
+            if(model->server_object() == server::server_objects::CertUsers){
+                auto f_index = model->find(sid.c_str(), model->get_column_index("sid"), QModelIndex());
+                if(f_index.isValid()){
+                    json object;
+                    is_cert_user_exists(host.c_str(), system_user.c_str(), object);
+                    if(object.is_object()){
+                        model->set_object(f_index, object);
+                    }
+                }
+            }
+        }
     }
 
 }
@@ -1880,7 +1922,7 @@ void MainWindow::on_btnAdd_clicked()
                     cnt.set_volume(dlgResult[1]);
                     while (it.hasNext()) {
                         dir = it.next();
-                        qDebug() << dir;
+                        //qDebug() << dir;
                         //получаем имя контейнера из файла name.key
                         auto org_name = CryptContainer::get_local_original_name(dir);
                         if(org_name.isEmpty()){
@@ -1978,7 +2020,7 @@ void MainWindow::on_btnAdd_clicked()
                     dlg.exec();
                     if(dlg.result() == QDialog::Accepted){
                         auto cnt = dlg.selectedObject();
-                        qDebug() << cnt.dump().c_str();
+                        //qDebug() << cnt.dump().c_str();
                         auto volume = cnt.value("volume", "");
                         std::string cnt_str;
                         if(!volume.empty())
@@ -2556,6 +2598,14 @@ void MainWindow::on_btnInfo_clicked()
             dlg.exec();
         }
 
+    }else  if(model->server_object() == arcirk::server::LocalhostUserContainers){
+        auto object = model->get_object(index);
+        QString vol = object.value("volume", "").c_str();
+        vol.append(object.value("name", "").c_str());
+        auto info = current_user->get_container_info(vol);
+            auto dlg = DialogInfo(info, object.value("name", "").c_str(), this);
+            dlg.setModal(true);
+            dlg.exec();
     }
 }
 
@@ -2884,7 +2934,7 @@ void MainWindow::run_mstsc_link(const arcirk::client::mstsc_options &opt)
     {
         //cmd_text.append(data);
         std::string result_ = arcirk::to_utf(data.toStdString(), "cp866");
-        qDebug() << qPrintable(result_.c_str());
+        //qDebug() << qPrintable(result_.c_str());
     };
     loop.connect(&cmd, &CommandLine::output, output);
 
@@ -2949,13 +2999,13 @@ void MainWindow::on_btnRegistryUser_clicked()
         if(dlg_sel_group.result() == QDialog::Accepted){
             auto group = dlg_sel_group.selectedObject();
             auto parent_struct = pre::json::from_json<arcirk::database::cert_users>(group);
-            add_cert_user(parent_struct, object.host_name.c_str(), object.user_name.c_str(), object.user_uuid.c_str(), object.system_user.c_str());
+            add_cert_user(parent_struct, object.host_name.c_str(), object.user_name.c_str(), object.user_uuid.c_str(), object.system_user.c_str(), object.sid.c_str());
         }
         delete m_tree;
     }
 }
 
-void MainWindow::add_cert_user(const arcirk::database::cert_users &parent, const QString& host, const QString& name, const QString& uuid, const QString& system_user)
+void MainWindow::add_cert_user(const arcirk::database::cert_users &parent, const QString& host, const QString& name, const QString& uuid, const QString& system_user, const QString& sid)
 {
     using namespace arcirk::server;
     using json = nlohmann::json;
@@ -2968,6 +3018,7 @@ void MainWindow::add_cert_user(const arcirk::database::cert_users &parent, const
     struct_users.second = name.toStdString();
     struct_users.uuid = uuid.toStdString();
     struct_users.system_user = system_user.toStdString();
+    struct_users.sid = sid.toStdString();
 
     m_models[DatabaseUsers]->fetchRoot("Users");
 
@@ -3007,8 +3058,8 @@ void MainWindow::add_cert_user(const arcirk::database::cert_users &parent, const
 
     dlg.exec();
     if(dlg.result() == QDialog::Accepted){
-
-        if(is_cert_user_exists(struct_users.host.c_str(), struct_users.system_user.c_str())){
+        json obj;
+        if(is_cert_user_exists(struct_users.host.c_str(), struct_users.system_user.c_str(), obj)){
             displayError("Ошибка", QString("Пользователь %1/%2 уже зарегистрирован!").arg(struct_users.host.c_str(), struct_users.system_user.c_str()));
             return;
         }
@@ -3053,7 +3104,7 @@ void MainWindow::add_cert_user(const arcirk::database::cert_users &parent, const
     }
 }
 
-bool MainWindow::is_cert_user_exists(const QString &host, const QString &system_user)
+bool MainWindow::is_cert_user_exists(const QString &host, const QString &system_user, nlohmann::json& object)
 {
     using namespace arcirk::server;
     using json = nlohmann::json;
@@ -3061,7 +3112,7 @@ bool MainWindow::is_cert_user_exists(const QString &host, const QString &system_
     json query_param = {
         {"table_name", arcirk::enum_synonym(tables::tbCertUsers)},
         {"query_type", "select"},
-        {"values", json{"first"}},
+        {"values", json{}},
         {"where_values", json{
                 {"host", host.toStdString()},
                 {"system_user", system_user.toStdString()}
@@ -3073,7 +3124,47 @@ bool MainWindow::is_cert_user_exists(const QString &host, const QString &system_
                                          {"query_param", base64_param}
                                      });
     auto arr = us.value("rows", json::array());
+    if(arr.size() > 0){
+        object = arr[0];
+    }
     return arr.size() > 0;
+}
+
+QModelIndex MainWindow::is_user_online(const QString &host, const QString &system_user, const QString& app_name)
+{
+    using namespace arcirk::database;
+    using json = nlohmann::json;
+    using namespace arcirk::server;
+
+    auto query_param = json{
+            {"table", true},
+            {"uuid_form", NIL_STRING_UUID},
+            {"empty_column", false}
+    };
+
+    std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+    auto resp = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ServerOnlineClientsList), query_param);
+    if(resp  != WS_RESULT_ERROR){
+        if(resp.is_object()){
+            auto online_users = m_models[OnlineUsers];
+            resetModel(OnlineUsers, resp);
+            for (auto i = 0; i < online_users->rowCount(QModelIndex()); i++) {
+                auto object = online_users->get_object(online_users->index(i, 0, QModelIndex()));
+                if(!object.empty()){
+                    auto struct_obj = arcirk::secure_serialization<client::session_info>(object);
+                    if(struct_obj.host_name == host.toStdString() && struct_obj.system_user == system_user.toStdString()){
+                        if(app_name.isEmpty())
+                            return online_users->index(i, 0, QModelIndex());
+                        else
+                            if(app_name.toStdString() == struct_obj.app_name)
+                                return online_users->index(i, 0, QModelIndex());
+                    }
+                }
+            }
+        }
+    }
+
+    return QModelIndex();
 }
 
 void MainWindow::on_btnEditCache_clicked()
@@ -3213,3 +3304,49 @@ QString MainWindow::cache_mstsc_directory()
         f.mkpath(f.path());
     return f.path();
 }
+
+void MainWindow::on_btnSystemUsers_clicked()
+{
+    auto index = ui->treeView->currentIndex();
+    if(!index.isValid()){
+        QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
+        return;
+    }
+
+    auto model = (TreeViewModel*)ui->treeView->model();
+    using namespace arcirk::database;
+    using json = nlohmann::json;
+    using namespace arcirk::server;
+
+    if(model->server_object() == Devices){
+        auto object = model->get_object(index);
+
+        auto type = object["device_type"].get<device_types>();
+        if(type != device_types::devServer && type != device_types::devDesktop){
+            QMessageBox::critical(this, "Ошибка", "Для данного устройства не доступен список пользователей!");
+            return;
+        }
+
+        auto query_param = json{
+                {"table", true},
+                {"uuid_form", NIL_STRING_UUID},
+                {"empty_column", false}
+        };
+
+        std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+        auto resp = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ServerOnlineClientsList), query_param);
+        if(resp  != WS_RESULT_ERROR){
+            if(resp.is_object()){
+                auto online_users = m_models[OnlineUsers];
+                resetModel(OnlineUsers, resp);
+                auto index = TreeViewModel::find_in_table(online_users, object["ref"].get<std::string>().c_str(), online_users->get_column_index("device_id"));
+                if(!index.isValid()){
+                    QMessageBox::critical(this, "Ошибка", "Устройство не в сети!");
+                    return;
+                }
+            }
+        }
+
+    }
+}
+

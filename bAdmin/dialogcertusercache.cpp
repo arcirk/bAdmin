@@ -60,6 +60,9 @@ void DialogCertUserCache::accept()
     cache["auto_connect"] = ui->chkAutoConnect->isChecked();
 
     cache["use_sid"] = ui->chUseSid->isChecked();
+    cache["allow_profile_manager"] = ui->chkAllowProfileManager->isChecked();
+    cache["allow_cryptopro"] = ui->chkAllowCryptoPro->isChecked();
+    cache["allow_mstsc"] = ui->chkAllowMstsc->isChecked();
 
     write_mstsc_param();
     write_mpl_options();
@@ -380,10 +383,15 @@ void DialogCertUserCache::read_cache(const nlohmann::json &data)
     ui->chkAutoConnect->setCheckState(cache.value("auto_connect", true) ? Qt::Checked : Qt::Unchecked);
     ui->txtServerUser->setText(cli_param.user_name.c_str());
     ui->chUseSid->setChecked(cache.value("use_sid", true));
+    ui->chkAllowCryptoPro->setChecked(cache.value("allow_cryptopro", false));
+    ui->chkAllowMstsc->setChecked(cache.value("allow_mstsc", false));
+    ui->chkAllowProfileManager->setChecked(cache.value("allow_profile_manager", false));
 
     read_mpl_options();
 
     read_crypt_data();
+
+
 
     form_control();
 }

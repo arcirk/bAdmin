@@ -223,7 +223,22 @@ nlohmann::json CommandLineParser::parse(const QString &response, CmdCommand comm
                 QString _info = _str.left(pKey);
                 QString tmp = _str.mid(pKey, endpKey - pKey);
                 _info.append("\n" + tmp);
-                return _info.toStdString();
+
+                auto lst = _info.split("\n");
+                auto result = json::object();
+                foreach (auto str, lst) {
+                    auto item = str.split(":");
+                    auto key = item[0].trimmed();
+                    std::string val = item.size() >= 2 ? item[1].toStdString() : "";
+                    if(key == "Valid" || key == "PrivKey"){
+                        result[key.toStdString()] = str.right(str.length() - key.length() - 1).trimmed().toStdString();
+                    }else{
+                        if(!val.empty())
+                            result[item[0].toStdString()] = parse_details(val);
+                    }
+                }
+
+                return result;
             }
         }
 //        else if(command == csptestContainerCopy){
@@ -257,4 +272,22 @@ QString CommandLineParser::getLine(const QString &source, int start)
     }
 
     return "";
+}
+
+
+nlohmann::json CommandLineParser::parse_details(const std::string &details)
+{
+    auto s = QString::fromStdString(details);
+    auto lst = s.split("\r ");
+    auto result = nlohmann::json::object();
+    foreach (auto val, lst) {
+        auto ind = val.indexOf("=");
+        if(ind != -1){
+            auto key = val.left(ind).trimmed();
+            auto value = val.right(val.length() - ind - 1).trimmed();
+            result[key.toStdString()] = value.toStdString();
+        }
+    }
+
+    return result;
 }

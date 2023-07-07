@@ -30,9 +30,20 @@ void DialogInfo::set_info(const json &info)
             auto lbl = new QLabel();
             QString str;
             int i = 0;
-            for(auto it = info.items().begin(); it != info.items().end(); ++it){
+            for(auto it = obj.items().begin(); it != obj.items().end(); ++it){
                 QString n = i == 0 ? "" : "\n";
-                str.append(n + QString::fromStdString(it.key()) + ": " + QString::fromStdString(obj[it.key()].get<std::string>()).split(",").join("\n").trimmed());
+                auto val = obj[it.key()];
+                if(val.is_string())
+                    str.append(n + QString::fromStdString(it.key()) + ": " + QString::fromStdString(obj[it.key()].get<std::string>()).split(",").join("\n").trimmed());
+                else if(val.is_object()){
+                    QStringList details;
+                    for(auto dt = val.items().begin(); dt != val.items().end(); ++dt){
+                        auto d_val = dt.value();
+                        if(d_val.is_string())
+                            details.append(QString::fromStdString(dt.key() + ": " + d_val.get<std::string>()));
+                    }
+                    str.append(n + QString::fromStdString(it.key()) + ": " + details.join("\n").trimmed());
+                }
                 i++;
             }
             lbl->setText(str);

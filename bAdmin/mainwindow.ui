@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>862</width>
+    <width>967</width>
     <height>600</height>
    </rect>
   </property>
@@ -357,6 +357,20 @@
         </widget>
        </item>
        <item>
+        <widget class="QToolButton" name="btnSystemUsers">
+         <property name="text">
+          <string>...</string>
+         </property>
+         <property name="icon">
+          <iconset resource="resurses.qrc">
+           <normaloff>:/img/userToDatabase.png</normaloff>:/img/userToDatabase.png</iconset>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QLabel" name="label_5">
          <property name="maximumSize">
           <size>
@@ -440,10 +454,11 @@
       <zorder>label_4</zorder>
       <zorder>btnSetLinkDevice</zorder>
       <zorder>btnRegistryDevice</zorder>
-      <zorder>label_5</zorder>
       <zorder>btnTaskRestart</zorder>
       <zorder>btnStartTask</zorder>
       <zorder>btnEditCache</zorder>
+      <zorder>label_5</zorder>
+      <zorder>btnSystemUsers</zorder>
      </widget>
     </item>
     <item row="1" column="0">
@@ -463,7 +478,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>862</width>
+     <width>967</width>
      <height>21</height>
     </rect>
    </property>

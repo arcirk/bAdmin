@@ -23,9 +23,9 @@ public:
     win_user_info getInfo() const;
     //static win_user_info get_win_user_info();
 
-    nlohmann::json getCertificates(bool brief);
+    json getCertificates(bool brief);
 
-    nlohmann::json getContainers();
+    json getContainers();
 
     QString getCryptoProCSP() const;
 
@@ -36,6 +36,8 @@ public:
     void read_database_cache(const QUrl &ws, const QString& token);
 
     json cache() const;
+
+    json get_container_info(const QString& name);
 
 private:
     win_user_info user_info_;

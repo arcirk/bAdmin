@@ -44,6 +44,9 @@ DialogEditCertUser::DialogEditCertUser(arcirk::database::cert_users& source, con
     ui->cmbHosts->setCurrentText(source_.host.c_str());
 
     ui->txtSystemUser->setEnabled(!is_group);
+    ui->lblSid->setVisible(!is_group);
+    ui->txtSid->setVisible(!is_group);
+
 
     if(is_new)
         setWindowTitle("Новый пользователь");
@@ -91,6 +94,8 @@ DialogEditCertUser::DialogEditCertUser(arcirk::database::cert_users &source, con
     ui->cmbHosts->setCurrentText(source_.host.c_str());
 
     ui->txtSystemUser->setEnabled(!is_group);
+    ui->lblSid->setVisible(!is_group);
+    ui->txtSid->setVisible(!is_group);
 
     if(is_new)
         setWindowTitle("Новый пользователь");

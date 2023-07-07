@@ -23,6 +23,7 @@ public:
     ~TreeViewModel();
     QModelIndex index(int row, int column, const QModelIndex &parent) const override;
     QModelIndex parent(const QModelIndex &child) const override;
+    QModelIndex find(const QString& find_value, int col, const QModelIndex& parent);
     QHash<int, QByteArray> roleNames() const override;
     int rowCount(const QModelIndex &parent) const override;
     int columnCount(const QModelIndex &parent) const override;

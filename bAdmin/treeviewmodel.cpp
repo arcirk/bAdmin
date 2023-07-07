@@ -559,7 +559,9 @@ void TreeViewModel::set_table(const nlohmann::json& tableModel){
         endResetModel();
     }
 
-    auto cols = tableModel["columns"];
+    //qDebug() << qPrintable(tableModel.dump().c_str());
+    auto cols = tableModel.value("columns", nlohmann::json::array());
+    Q_ASSERT(cols.size() > 0);
     if(cols.is_array()){
         for (auto itr = cols.begin(); itr != cols.end(); ++itr) {
             columns.push_back(QString::fromStdString(*itr));
@@ -682,6 +684,19 @@ QModelIndex TreeViewModel::find_in_table(QAbstractItemModel *model, const QStrin
         }
     }
 
+    return QModelIndex();
+}
+
+QModelIndex TreeViewModel::find(const QString& find_value, int col, const QModelIndex& parent){
+    QModelIndexList matches = match(
+                index(0,col, parent),
+                Qt::DisplayRole,
+                QVariant(find_value),
+                -1,
+                Qt::MatchRecursive);
+    foreach (const QModelIndex &match, matches){
+        return match;
+    }
     return QModelIndex();
 }
 

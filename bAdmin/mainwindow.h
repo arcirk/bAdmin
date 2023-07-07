@@ -67,6 +67,8 @@ private slots:
     void on_btnRegistryUser_clicked();
     void on_btnEditCache_clicked();
 
+    void on_btnSystemUsers_clicked();
+
 private:
     Ui::MainWindow *                         ui;
     WebSocketClient *                        m_client;
@@ -135,8 +137,15 @@ private:
     void update_columns();
 
     void edit_cert_user(const QModelIndex &index);
-    void add_cert_user(const arcirk::database::cert_users& parent, const QString& host = "", const QString& name = "", const QString& uuid = "", const QString& system_user = "");
-    bool is_cert_user_exists(const QString& host, const QString& system_user);
+    void add_cert_user(const arcirk::database::cert_users& parent,
+                       const QString& host = "",
+                       const QString& name = "",
+                       const QString& uuid = "",
+                       const QString& system_user = "",
+                       const QString& sid = "");
+    bool is_cert_user_exists(const QString& host, const QString& system_user, nlohmann::json& object);
+    QModelIndex is_user_online(const QString& host, const QString& system_user, const QString& app_name = "");
+
     void setVisible(bool visible) override;
 
     QIcon get_link_icon(const QString& link);

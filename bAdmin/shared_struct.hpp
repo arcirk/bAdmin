@@ -270,7 +270,9 @@ BOOST_FUSION_DEFINE_STRUCT(
         (std::string, host_name)
         (std::string, product)
         (std::string, system_user)
+        (std::string, sid)
 )
+
 
 BOOST_FUSION_DEFINE_STRUCT(
         (arcirk::client), mstsc_options,
@@ -365,6 +367,8 @@ namespace arcirk::server{
         TasksRestart,
         RunTask,
         StopTask,
+        SendNotify,
+        GetCertUser,
         CMD_INVALID=-1,
     };
 
@@ -404,6 +408,8 @@ namespace arcirk::server{
         {TasksRestart, "TasksRestart"}    ,
         {RunTask, "RunTask"}    ,
         {StopTask, "StopTask"}    ,
+        {SendNotify, "SendNotify"}    ,
+        {GetCertUser, "GetCertUser"}    ,
     });
 
     enum server_objects{
@@ -1154,6 +1160,7 @@ namespace arcirk::command_line {
         mstscRunAsAdmin,
         cmdCD,
         cmdEXIT,
+        wmicUserAccount,
         COMMAND_INVALID=-1,
     };
 }
