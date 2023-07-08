@@ -127,8 +127,10 @@ QUrl WebSocketClient::url() const
     return url_;
 }
 
-void WebSocketClient::open()
+void WebSocketClient::open(const std::string& sid)
 {
+    m_sid = sid;
+
     if(conf_.server_host.empty())
         return;
 
@@ -136,6 +138,9 @@ void WebSocketClient::open()
         return;
 
     QUrl _url(conf_.server_host.data());
+    server_conf_.ServerHost = _url.host().toStdString();
+    server_conf_.ServerPort = _url.port();
+    server_conf_.ServerSSL = _url.scheme() == "wss" ? true : false;
     m_client->open(_url);
 
 }
@@ -583,7 +588,7 @@ void WebSocketClient::onConnected()
     param.device_id = conf_.device_id;
     param.product = QSysInfo::prettyProductName().toStdString();
     param.system_user = system_user_.toStdString();
-
+    param.sid = m_sid;
     std::string p = pre::json::to_json(param).dump();
     QByteArray ba(p.c_str());
     nlohmann::json _param = {

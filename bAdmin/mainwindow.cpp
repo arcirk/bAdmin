@@ -111,8 +111,8 @@ void MainWindow::reconnect()
     if(m_client->isConnected())
             m_client->close();
 
-    m_client->open();
-    infoBar->setText("Попытка подключения ...");
+    m_client->open(current_user->getInfo().sid);
+    infoBar->setText(QString("Попытка подключения %1 ...").arg(m_client->url().toString()));
     set_enable_form(false);
     ui->toolBar->setEnabled(false);
 }
@@ -280,6 +280,7 @@ void MainWindow::serverResponse(const arcirk::server::server_response &message)
         get_online_users();
     }else if(message.command == "update_certUsers"){
         auto param = nlohmann::json::parse(QByteArray::fromBase64(message.param.data()));
+        qDebug() << param.dump().c_str();
         auto sid = param.value("sid", "");
         auto host = param.value("host", "");
         auto system_user = param.value("system_user", "");
@@ -341,21 +342,15 @@ void MainWindow::onCertUserCache(const QUrl &ws, const QString &host, const QStr
 
 void MainWindow::onMozillaProfiles(const QString &host, const QString &system_user)
 {
-    auto model_online_users = m_models[arcirk::server::server_objects::OnlineUsers];
-    bool is_online = false;
-    arcirk::client::session_info struct_obj;
-    for (auto i = 0; i < model_online_users->rowCount(QModelIndex()) ; ++i) {
-        auto object = model_online_users->get_object(model_online_users->index(i,0, QModelIndex()));
-        struct_obj = pre::json::from_json<arcirk::client::session_info>(object);
-        if(struct_obj.host_name == host.toStdString() && struct_obj.system_user == system_user.toStdString()){
-            is_online = true;
-            break;
-        }
-    }
+    auto index = is_user_online(host, system_user);
+    bool is_online = index.isValid();
 
     if(!is_online)
         QMessageBox::critical(this, "Ошибка", "Клиент не в сети!");
     else{
+        auto model_online_users = m_models[arcirk::server::server_objects::OnlineUsers];
+        auto object = model_online_users->get_object(index);
+        auto struct_obj = pre::json::from_json<arcirk::client::session_info>(object);
         if(struct_obj.session_uuid == m_client->currentSession().toString(QUuid::WithoutBraces).toStdString()){
             auto lst = CertUser::read_mozilla_profiles();
             lst.insert(0, " ");

@@ -13,6 +13,7 @@
 #include <dialoginfo.h>
 #include <QStandardPaths>
 #include <QDir>
+#include <QFileDialog>
 //#include "crypter/crypter.hpp"
 
 DialogCertUserCache::DialogCertUserCache(arcirk::database::cert_users& obj, TreeViewModel * users_model,
@@ -932,5 +933,13 @@ void DialogCertUserCache::on_btnMstscRemove_clicked()
 void DialogCertUserCache::on_btnMstsc_clicked()
 {
 
+}
+
+
+void DialogCertUserCache::on_btnSelectPathFirefox_clicked()
+{
+    auto folder = QFileDialog::getExistingDirectory(this, "Выбор каталога", ui->txtFirefoxPath->text());
+    if(!folder.isEmpty())
+        ui->txtFirefoxPath->setText(folder);
 }
 

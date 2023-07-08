@@ -53,6 +53,8 @@ private slots:
     void on_btnMstscRemove_clicked();
     void on_btnMstsc_clicked();
 
+    void on_btnSelectPathFirefox_clicked();
+
 private:
     Ui::DialogCertUserCache *ui;
     arcirk::database::cert_users& object;

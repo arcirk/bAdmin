@@ -33,7 +33,7 @@ public:
 
     QUrl url() const;
 
-    void open();
+    void open(const std::string& sid = "");
     void close();
     void write_conf();
 
@@ -68,6 +68,7 @@ private:
     server::server_config server_conf_;
     QWebSocket* m_client;
     QString system_user_;
+    std::string m_sid;
 
     QUuid m_currentSession;
     QUuid m_currentUserUuid;
