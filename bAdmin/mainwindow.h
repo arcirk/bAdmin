@@ -172,6 +172,8 @@ signals:
     void certUserContainers(const arcirk::client::cryptopro_data& data);
     void selectHosts(const nlohmann::json& hosts);
     void selectDatabaseUser(const nlohmann::json &user);
+    void availableCertificates(const json& table);
+    void selectCertificate(const json& cert);
 
 public slots:
     void openConnection();
@@ -191,6 +193,8 @@ public slots:
 
     void wsError(const QString& what, const QString& command, const QString& err);
 
+    void doAvailableCertificates(const QString& user_uuid);
+    void onSelectCertificate();
 
 };
 #endif // MAINWINDOW_H

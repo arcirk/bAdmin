@@ -14,7 +14,7 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QFileDialog>
-//#include "crypter/crypter.hpp"
+#include "commandline.h"
 
 DialogCertUserCache::DialogCertUserCache(arcirk::database::cert_users& obj, TreeViewModel * users_model,
                                          const QString& def_url, QWidget *parent) :
@@ -68,15 +68,104 @@ void DialogCertUserCache::accept()
     write_mstsc_param();
     write_mpl_options();
     write_crypt_data();
+    write_available_certificates();
 
     object.cache = cache.dump();
 
     QDialog::accept();
 }
 
+
+void DialogCertUserCache::editMstsc(const QString& host, const QString& usr, const QString& pwd, const QString& name)
+{
+    QString command;
+
+    QString address = host;
+
+    command = QString("cmdkey /add:%1 /user:%2 /pass:%3 & ").arg("TERMSRV/" + address, name, pwd);
+
+    QFile f(cache_mstsc_directory() + "/" + name + ".rdp");
+
+    command.append("mstsc /edit \"" + QDir::toNativeSeparators(f.fileName()) + "\" & exit");
+
+    auto cmd = CommandLine(this);
+    QEventLoop loop;
+
+    auto started = [&cmd, &command]() -> void
+    {
+        cmd.send(command, CmdCommand::mstscEditFile);
+    };
+    loop.connect(&cmd, &CommandLine::started_process, started);
+
+    auto output = [](const QByteArray& data) -> void
+    {
+        std::string result_ = arcirk::to_utf(data.toStdString(), "cp866");
+    };
+    loop.connect(&cmd, &CommandLine::output, output);
+
+    auto err = [&loop, &cmd](const QString& data, int command) -> void
+    {
+        qDebug() << __FUNCTION__ << data << command;
+        cmd.stop();
+        loop.quit();
+    };
+    loop.connect(&cmd, &CommandLine::error, err);
+
+    auto state = [&loop]() -> void
+    {
+        loop.quit();
+    };
+    loop.connect(&cmd, &CommandLine::complete, state);
+
+    cmd.start();
+    loop.exec();
+}
+
+void DialogCertUserCache::openMstsc(const QString &name)
+{
+    qDebug() << __FUNCTION__;
+
+    auto cmd = CommandLine(this);
+    QEventLoop loop;
+    QFile f(cache_mstsc_directory() + "/" + name + ".rdp");
+
+    auto started = [&cmd, &f]() -> void
+    {
+        QString command = QString("mstsc /edit \"%1\" & exit").arg(QDir::toNativeSeparators(f.fileName()));
+        cmd.send(command, CmdCommand::COMMAND_INVALID);
+    };
+    loop.connect(&cmd, &CommandLine::started_process, started);
+
+    QByteArray cmd_text;
+    auto output = [&cmd_text](const QByteArray& data) -> void
+    {
+        cmd_text.append(data);
+    };
+    loop.connect(&cmd, &CommandLine::output, output);
+    auto err = [&loop, &cmd](const QString& data, int command) -> void
+    {
+        qDebug() << __FUNCTION__ << data << command;
+        cmd.stop();
+        loop.quit();
+    };
+    loop.connect(&cmd, &CommandLine::error, err);
+
+    auto state = [&loop]() -> void
+    {
+        loop.quit();
+    };
+    loop.connect(&cmd, &CommandLine::complete, state);
+
+    cmd.start();
+    loop.exec();
+}
+
+
+
 void DialogCertUserCache::set_is_localhost(bool value)
 {
     is_localhost_ = value;
+    ui->btnMstsc->setEnabled(value);
 }
 
 
@@ -142,6 +231,35 @@ void DialogCertUserCache::on_btnPwdEdit_toggled(bool checked)
         on_btnPwdView_toggled(false);
         ui->btnPwdView->setChecked(false);
     }
+}
+
+void DialogCertUserCache::read_available_certificates(){
+    using namespace arcirk::database;
+    using json = nlohmann::json;
+    auto table = cache.value("available_certificates", json::object());
+    auto model = new TreeViewModel(this);
+    if(!table.empty()){
+        //model->set_column_aliases(m_aliases);
+        model->set_rows_icon(QIcon(":/img/cert16NoKey.png"));
+        model->set_table(table);
+    }else{
+        auto a_certs = table_default_json(tables::tbAvailableCertificates);
+        auto table = json::object();
+        auto columns = json::array();
+        auto rows = json::array();
+        for (auto itr = a_certs.items().begin(); itr != a_certs.items().end(); ++itr) {
+            columns += itr.key();
+        }
+        table["columns"] = columns;
+        table["rows"] = rows;
+        model->set_table(table);
+    }
+}
+
+void DialogCertUserCache::write_available_certificates(){
+    auto model = (TreeViewModel*)ui->treeAvailableCerts->model();
+    auto table = model->get_table_model(QModelIndex());
+    cache["available_certificates"] = table;
 }
 
 void DialogCertUserCache::read_mstsc_param()
@@ -392,7 +510,7 @@ void DialogCertUserCache::read_cache(const nlohmann::json &data)
 
     read_crypt_data();
 
-
+    read_available_certificates();
 
     form_control();
 }
@@ -570,6 +688,19 @@ void DialogCertUserCache::doSelectDatabaseUser()
 void DialogCertUserCache::onSelectDatabaseUser(const json &user)
 {
     emit setSelectDatabaseUser(user);
+}
+
+void DialogCertUserCache::onAvailableCertificates(const json &table)
+{
+    if(table.is_object()){
+        auto model = (TreeViewModel*)ui->treeAvailableCerts->model();
+        model->set_table(table);
+    }
+}
+
+void DialogCertUserCache::onSelectCertificate(const json cert)
+{
+
 }
 
 
@@ -795,8 +926,10 @@ void DialogCertUserCache::on_btnResetCertIlst_clicked()
     auto currentTab = ui->tabCrypt->currentIndex();
     if(currentTab == 0)
         emit getCertificates(object.host.c_str(), object.system_user.c_str());
-    else
+    else if(currentTab == 1)
         emit getContainers(object.host.c_str(), object.system_user.c_str());
+    else if(currentTab == 2)
+        emit getAvailableCertificates(object.ref.c_str());
 }
 
 
@@ -904,7 +1037,14 @@ void DialogCertUserCache::column_aliases()
 
 void DialogCertUserCache::on_btnCertAdd_clicked()
 {
+    auto tab = ui->tabWidget->currentIndex();
+    if(tab == 0){
 
+    }else if(tab == 1){
+
+    }else if(tab == 2){
+        emit selectCertificate();
+    }
 }
 
 
@@ -932,7 +1072,36 @@ void DialogCertUserCache::on_btnMstscRemove_clicked()
 
 void DialogCertUserCache::on_btnMstsc_clicked()
 {
+    qDebug() << __FUNCTION__;
 
+    auto table = ui->treeViewMstsc;
+    auto index = table->currentIndex();
+    if(!index.isValid()){
+        QMessageBox::critical(this, "Ошибка", "Не выбрана строка!");
+        return;
+    }
+
+    auto model = (TreeViewModel*)table->model();
+    auto object = arcirk::secure_serialization<arcirk::client::mstsc_options>(model->get_object(index));
+
+    if(!object.reset_user){
+        openMstsc(object.name.c_str());
+    }else{
+        std::string _pwd = object.password;
+        QString address = object.address.c_str();
+        int port = object.port;
+        bool defPort = object.def_port;
+        QString user = object.user_name.c_str();
+        if(!defPort){
+            address.append(":" + QString::number(port));
+        }
+
+        std::string pwd;
+        if(!_pwd.empty())
+            pwd = arcirk::crypt(_pwd, CRYPT_KEY);
+
+        editMstsc(address, user, pwd.c_str(), object.name.c_str());
+    }
 }
 
 
@@ -943,3 +1112,12 @@ void DialogCertUserCache::on_btnSelectPathFirefox_clicked()
         ui->txtFirefoxPath->setText(folder);
 }
 
+QString DialogCertUserCache::cache_mstsc_directory()
+{
+    auto app_data = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    app_data.append("/mstsc");
+    QDir f(app_data);
+    if(!f.exists())
+        f.mkpath(f.path());
+    return f.path();
+}

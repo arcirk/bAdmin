@@ -52,7 +52,6 @@ private slots:
     void on_btnCertDelete_clicked();
     void on_btnMstscRemove_clicked();
     void on_btnMstsc_clicked();
-
     void on_btnSelectPathFirefox_clicked();
 
 private:
@@ -90,9 +89,15 @@ private:
 
     void update_mpl_items_icons();
 
+    void read_available_certificates();
+    void write_available_certificates();
+
     template<typename T>
     T getStructData(const std::string& name, const json& source);
 
+    void editMstsc(const QString& host, const QString& usr, const QString& pwd, const QString& name);
+    void openMstsc(const QString &name);
+    QString cache_mstsc_directory();
 signals:
     void getData(const QUrl &ws, const QString& host, const QString& system_user, QWidget *parent);
     void getMozillaProfiles(const QString& host, const QString& system_user);
@@ -103,6 +108,8 @@ signals:
     void setSelectHosts(const json& hosts);
     void selectDatabaseUser();
     void setSelectDatabaseUser(const json& user);
+    void getAvailableCertificates(const QString& user_uuid);
+    void selectCertificate();
 
 public slots:
    void onCertUserCache(const QString& host, const QString& system_user, const nlohmann::json& data);
@@ -115,6 +122,8 @@ public slots:
    void doSelectHosts();
    void doSelectDatabaseUser();
    void onSelectDatabaseUser(const json& user);
+   void onAvailableCertificates(const json& table);
+   void onSelectCertificate(const json cert);
 };
 
 #endif // DIALOGCERTUSERCACHE_H

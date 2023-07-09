@@ -458,6 +458,42 @@ void MainWindow::wsError(const QString &what, const QString &command, const QStr
     qCritical() << what << command << err;
 }
 
+void MainWindow::doAvailableCertificates(const QString& user_uuid)
+{
+    json query_param = {
+        {"table_name", arcirk::enum_synonym(tables::tbAvailableCertificates)},
+        {"query_type", "select"},
+        {"values", json{}},
+        {"where_values", json{{"ref", user_uuid.toStdString()}}}
+    };
+    std::string base64_param = QByteArray::fromStdString(query_param.dump()).toBase64().toStdString();
+    auto result = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::ExecuteSqlQuery), json{
+                                         {"query_param", base64_param}
+                                     });
+
+    if(result == WS_RESULT_ERROR){
+
+    }else{
+
+    }
+}
+
+void MainWindow::onSelectCertificate()
+{
+    using namespace arcirk::server;
+    database_get_certificates_synch();
+    auto model = m_models[server_objects::Certificates];
+    auto dlg = DialogSelectInTree(model, this);
+    dlg.set_window_text("Выбор сетритификата");
+    dlg.setModal(true);
+    dlg.exec();
+    if(dlg.result() == QDialog::Accepted){
+        auto obj = dlg.selectedObject();
+        emit selectCertificate(obj);
+    }
+
+}
+
 void MainWindow::update_rdp_files(const nlohmann::json &items)
 {
     QDir dir(cache_mstsc_directory());
@@ -475,7 +511,7 @@ void MainWindow::update_rdp_files(const nlohmann::json &items)
                 continue;
             }else{
                 QString file_name = dir.path() + "/";
-                file_name.append(item.uuid.c_str());
+                file_name.append(item.name.c_str());
                 file_name.append(".rdp");
                 QFile f(file_name);
                 if(f.open(QIODevice::WriteOnly)){
@@ -1128,7 +1164,6 @@ void MainWindow::createModels()
         LocalhostUser,
         LocalhostUserCertificates,
         LocalhostUserContainers
-
     };
 //    LocalhostUserContainersRegistry,
 //    LocalhostUserContainersVolume
@@ -2908,11 +2943,9 @@ void MainWindow::run_mstsc_link(const arcirk::client::mstsc_options &opt)
         command = QString("cmdkey /add:%1 /user:%2 /pass:%3 & ").arg("TERMSRV/" + address, opt.user_name.c_str(), pwd);
     }
 
-    QFile f(cache_mstsc_directory() + "/" + opt.uuid.c_str() + ".rdp");
+    QFile f(cache_mstsc_directory() + "/" + opt.name.c_str() + ".rdp");
 
     command.append("mstsc \"" + QDir::toNativeSeparators(f.fileName()) + "\" & exit");
-
-    using json = nlohmann::json;
 
     auto cmd = CommandLine(this);
     QEventLoop loop;
@@ -3195,6 +3228,7 @@ void MainWindow::on_btnEditCache_clicked()
                                          });
         auto rows = dev.value("rows", json::array());
         auto dlg = DialogCertUserCache(struct_user, m_models[server_objects::DatabaseUsers], m_client->conf().server_host.c_str(), this);
+        dlg.set_is_localhost(struct_user.host == current_user->host().toStdString() && struct_user.system_user == current_user->user_name().toStdString());
 
         connect(&dlg, &DialogCertUserCache::getData, this, &MainWindow::onCertUserCache);
         connect(this, &MainWindow::certUserData, &dlg, &DialogCertUserCache::onCertUserCache);
@@ -3208,6 +3242,10 @@ void MainWindow::on_btnEditCache_clicked()
         connect(this, &MainWindow::selectDatabaseUser, &dlg, &DialogCertUserCache::onSelectDatabaseUser);
         connect(&dlg, &DialogCertUserCache::getContainers, this, &MainWindow::doGetCertUserContainers);
         connect(this, &MainWindow::certUserContainers, &dlg, &DialogCertUserCache::onContainers);
+        connect(&dlg, &DialogCertUserCache::getAvailableCertificates, this, &MainWindow::doAvailableCertificates);
+        connect(this, &MainWindow::availableCertificates, &dlg, &DialogCertUserCache::onAvailableCertificates);
+        connect(&dlg, &DialogCertUserCache::selectCertificate, this, &MainWindow::onSelectCertificate);
+        connect(this, &MainWindow::selectCertificate, &dlg, &DialogCertUserCache::onSelectCertificate);
 
         dlg.setModal(true);
         dlg.exec();

@@ -430,6 +430,7 @@ namespace arcirk::server{
         LocalhostUserContainers,
         LocalhostUserContainersRegistry,
         LocalhostUserContainersVolume,
+        AvailableCertificates,
         OBJ_INVALID=-1,
     };
 
@@ -452,6 +453,7 @@ namespace arcirk::server{
         {LocalhostUserContainers, "LocalhostUserContainers"},
         {LocalhostUserContainersRegistry, "LocalhostUserContainersRegistry"},
         {LocalhostUserContainersVolume, "LocalhostUserContainersVolume"},
+        {AvailableCertificates, "AvailableCertificates"},
     });
 
     enum application_names{
@@ -809,6 +811,20 @@ BOOST_FUSION_DEFINE_STRUCT(
         (int, version)
 );
 
+BOOST_FUSION_DEFINE_STRUCT(
+        (arcirk::database), available_certificates,
+        (int, _id)
+        (std::string, first)
+        (std::string, second)
+        (std::string, ref)
+        (std::string, user_uuid)
+        (std::string, cert_uuid)
+        (std::string, parent)
+        (int, is_group)
+        (int, deletion_mark)
+        (int, version)
+);
+
 namespace arcirk::database {
     enum tables{
         tbUsers,
@@ -829,6 +845,7 @@ namespace arcirk::database {
         tbCertificates,
         tbCertUsers,
         tbContainers,
+        tbAvailableCertificates,
         tables_INVALID=-1,
     };
 
@@ -852,6 +869,7 @@ namespace arcirk::database {
         {tbCertificates, "Certificates"}  ,
         {tbCertUsers, "CertUsers"}  ,
         {tbContainers, "Containers"}  ,
+        {tbAvailableCertificates, "AvailableCertificates"}  ,
     })
 
     static inline nlohmann::json table_default_json(arcirk::database::tables table) {
@@ -1026,6 +1044,17 @@ namespace arcirk::database {
                   auto tbl = containers();
                   tbl.ref = arcirk::uuids::nil_string_uuid();
                   tbl.parent = arcirk::uuids::nil_string_uuid();
+                  tbl.is_group = 0;
+                  tbl.deletion_mark = 0;
+                  tbl.version = 0;
+                  return pre::json::to_json(tbl);
+              }
+              case tbAvailableCertificates: {
+                  auto tbl = available_certificates();
+                  tbl.ref = arcirk::uuids::nil_string_uuid();
+                  tbl.parent = arcirk::uuids::nil_string_uuid();
+                  tbl.user_uuid = arcirk::uuids::nil_string_uuid();
+                  tbl.cert_uuid = arcirk::uuids::nil_string_uuid();
                   tbl.is_group = 0;
                   tbl.deletion_mark = 0;
                   tbl.version = 0;

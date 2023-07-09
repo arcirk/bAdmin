@@ -27,7 +27,7 @@
    <item row="1" column="0">
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
-      <number>1</number>
+      <number>2</number>
      </property>
      <widget class="QWidget" name="tab">
       <attribute name="icon">
@@ -468,6 +468,16 @@
            </item>
           </layout>
          </widget>
+         <widget class="QWidget" name="tabAvailableCerts">
+          <attribute name="title">
+           <string>Доступные сетрификаты</string>
+          </attribute>
+          <layout class="QGridLayout" name="gridLayout_13">
+           <item row="0" column="0">
+            <widget class="QTreeView" name="treeAvailableCerts"/>
+           </item>
+          </layout>
+         </widget>
         </widget>
        </item>
        <item row="2" column="0">
@@ -733,6 +743,9 @@
          </item>
          <item>
           <widget class="QToolButton" name="btnMstsc">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
            <property name="text">
             <string>mstsc</string>
            </property>
