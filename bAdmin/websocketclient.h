@@ -110,6 +110,7 @@ signals:
     void connectionChanged(bool state);
     void serverResponse(const arcirk::server::server_response& message);
     void notify(const QString& message);
+    void commandToClientResponse(const arcirk::server::server_response& message);
 
 private slots:
 

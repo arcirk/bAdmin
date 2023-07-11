@@ -266,7 +266,8 @@ void WebSocketClient::parse_response(const QString &resp)
         }else if(msg.command == "notify"){
             emit notify(msg.message.c_str());
         }else if(msg.command == arcirk::enum_synonym(arcirk::server::server_commands::CommandToClient)){
-            qDebug() << msg.command.c_str();
+            //qDebug() << msg.command.c_str();
+            emit commandToClientResponse(msg);
         }else
             emit serverResponse(msg);
     } catch (std::exception& e) {

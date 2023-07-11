@@ -54,6 +54,8 @@ private slots:
     void on_btnMstsc_clicked();
     void on_btnSelectPathFirefox_clicked();
 
+    void on_btnMstscCopy_clicked();
+
 private:
     Ui::DialogCertUserCache *ui;
     arcirk::database::cert_users& object;
@@ -108,7 +110,7 @@ signals:
     void setSelectHosts(const json& hosts);
     void selectDatabaseUser();
     void setSelectDatabaseUser(const json& user);
-    void getAvailableCertificates(const QString& user_uuid);
+    //void getAvailableCertificates(const QString& user_uuid);
     void selectCertificate();
 
 public slots:

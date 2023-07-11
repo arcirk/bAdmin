@@ -21,6 +21,9 @@
 #include <QMenu>
 #include <QCloseEvent>
 
+#include "cryptcertificate.h"
+#include "cryptcontainer.h"
+
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
@@ -66,7 +69,6 @@ private slots:
     void on_btnRegistryDevice_clicked();
     void on_btnRegistryUser_clicked();
     void on_btnEditCache_clicked();
-
     void on_btnSystemUsers_clicked();
 
 private:
@@ -161,7 +163,9 @@ private:
     void database_get_certificates_synch();
     void database_get_deviceview_asynch();
 
+    std::string database_set_certificate(CryptCertificate& cert, const QString& file_name);
     void database_insert_certificate();
+    void localhost_cert_to_database(const QString& sha1);
 
     void set_enable_form(bool value);
 signals:
@@ -193,8 +197,8 @@ public slots:
 
     void wsError(const QString& what, const QString& command, const QString& err);
 
-    void doAvailableCertificates(const QString& user_uuid);
+    //void doAvailableCertificates(const QString& user_uuid);
     void onSelectCertificate();
-
+    void onCommandToClient(const arcirk::server::server_response &message);
 };
 #endif // MAINWINDOW_H

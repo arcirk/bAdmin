@@ -25,6 +25,7 @@ public:
     QModelIndex parent(const QModelIndex &child) const override;
     QModelIndex find(const QString& find_value, int col, const QModelIndex& parent);
     QHash<int, QByteArray> roleNames() const override;
+    QVector<QString> columnNames();
     int rowCount(const QModelIndex &parent) const override;
     int columnCount(const QModelIndex &parent) const override;
     QVariant data(const QModelIndex &index, int role) const override;

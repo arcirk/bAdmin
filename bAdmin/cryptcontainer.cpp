@@ -429,9 +429,11 @@ nlohmann::json CryptContainer::info(const QString &container_name)
 
    std::string result_ = arcirk::to_utf(cmd_text.toStdString(), "cp866");
 
-   auto info__ = CommandLineParser::parse(result_.c_str(), csptestContainerFnfo);
+//   auto info__ = CommandLineParser::parse(result_.c_str(), csptestContainerFnfo);
 
-   auto result = parse(info__.get<std::string>().c_str());
+   //auto result = parse(info__.get<std::string>().c_str());
+    auto result = parse(result_.c_str());
+   //auto result = CommandLineParser::parse(result_.c_str(), csptestContainerFnfo);
 
    return result;
 
@@ -711,7 +713,7 @@ nlohmann::json CryptContainer::parse(const QString &info)
             continue;
         }else
             source = line.split(":");
-        if(source.size() > 0){
+        if(source.size() > 1){
             auto subObj = json::object();
             //QString details = source[1];
 

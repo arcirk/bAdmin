@@ -147,5 +147,6 @@
         <file>img/add_24.png</file>
         <file>img/addGroup.png</file>
         <file>img/addGroup_24.png</file>
+        <file>img/copy_24.png</file>
     </qresource>
 </RCC>

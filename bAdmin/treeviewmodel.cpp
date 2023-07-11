@@ -302,6 +302,14 @@ QHash<int, QByteArray> TreeViewModel::roleNames() const
     return names;
 }
 
+QVector<QString> TreeViewModel::columnNames()
+{
+    QVector<QString> result;
+    result.resize(columns.size());
+    std::copy(columns.begin(), columns.end(), result.begin());
+    return result;
+}
+
 int TreeViewModel::findRow(const NodeInfo *nodeInfo) const
 {
     Q_ASSERT(nodeInfo != 0);      

@@ -15,7 +15,7 @@ public:
 
     explicit CryptCertificate(QObject *parent = nullptr);
 
-    void fromLocal(const QString &sha);
+    bool fromLocal(const QString &sha);
     bool fromFile(const QString &path);
     bool fromByteArray(const QByteArray& data);
 

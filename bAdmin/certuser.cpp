@@ -198,6 +198,7 @@ nlohmann::json CertUser::get_local_certificates(bool brief)
     auto tmp = arcirk::database::table_default_json(arcirk::database::tables::tbCertificates);
     auto items = tmp.items();
     auto columns = json::array({"first", "issuer", "subject", "private_key", "not_valid_before", "not_valid_after", "sha1", "suffix", "parent_user", "cache"});
+    //auto columns_rus = json::array({"first", "и", "subject", "private_key", "not_valid_before", "not_valid_after", "sha1", "suffix", "parent_user", "cache"});
     auto rows = json::array();
 
     if(!brief){

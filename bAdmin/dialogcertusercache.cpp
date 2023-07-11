@@ -37,6 +37,14 @@ DialogCertUserCache::DialogCertUserCache(arcirk::database::cert_users& obj, Tree
     read_cache(cache);
 
     is_localhost_ = false;
+
+    auto buttons = ui->buttonBox->buttons();
+    foreach (auto btn, buttons) {
+        if(btn->text() == "Cancel")
+            btn->setText("Отмена");
+    }
+
+    //ui->treeCertificates->sortByColumn(0, Qt::AscendingOrder);
 }
 
 DialogCertUserCache::~DialogCertUserCache()
@@ -237,13 +245,28 @@ void DialogCertUserCache::read_available_certificates(){
     using namespace arcirk::database;
     using json = nlohmann::json;
     auto table = cache.value("available_certificates", json::object());
-    auto model = new TreeViewModel(this);
-    if(!table.empty()){
-        //model->set_column_aliases(m_aliases);
+    auto model = (TreeViewModel*)ui->treeAvailableCerts->model();
+    QVector<QString> m_order{
+        "first",
+        "subject",
+        "issuer",
+        "not_valid_before",
+        "not_valid_after",
+        "parent_user",
+        "private_key"
+    };
+    if(!model){
+        model = new TreeViewModel(this);
+        model->set_column_aliases(m_colAliases);
         model->set_rows_icon(QIcon(":/img/cert16NoKey.png"));
+        ui->treeAvailableCerts->setModel(model);
+    }
+    if(!table.empty()){
         model->set_table(table);
+        model->columns_establish_order(m_order);
     }else{
-        auto a_certs = table_default_json(tables::tbAvailableCertificates);
+       // auto a_certs = table_default_json(tables::tbAvailableCertificates);
+        auto a_certs = pre::json::to_json(arcirk::database::certificates_view());
         auto table = json::object();
         auto columns = json::array();
         auto rows = json::array();
@@ -253,6 +276,16 @@ void DialogCertUserCache::read_available_certificates(){
         table["columns"] = columns;
         table["rows"] = rows;
         model->set_table(table);
+        model->columns_establish_order(m_order);
+    }
+    ui->treeAvailableCerts->resizeColumnToContents(0);
+    auto cols = model->columnNames();
+    foreach (auto itr, cols) {
+        if(m_order.indexOf(itr) == -1){
+            auto ind = model->get_column_index(itr);
+            if(ind != -1)
+                ui->treeAvailableCerts->hideColumn(ind);
+        }
     }
 }
 
@@ -542,7 +575,7 @@ void DialogCertUserCache::edit_row(const QModelIndex &current_index)
     auto object = model->get_object(index);
     Q_ASSERT(!object.empty());
 
-    auto mstsc = arcirk::secure_serialization<arcirk::client::mstsc_options>(object);
+    auto mstsc = arcirk::secure_serialization<arcirk::client::mstsc_options>(object, __FUNCTION__);
     auto dlg = DialogMstsc(mstsc, this);
     connect(&dlg, &DialogMstsc::selectHost, this, &DialogCertUserCache::doSelectHosts);
     connect(this, &DialogCertUserCache::setSelectHosts, &dlg, &DialogMstsc::onSelectHost);
@@ -700,7 +733,18 @@ void DialogCertUserCache::onAvailableCertificates(const json &table)
 
 void DialogCertUserCache::onSelectCertificate(const json cert)
 {
+    qDebug() << __FUNCTION__; // << cert.dump().c_str();
 
+    auto cert_ = arcirk::secure_serialization<arcirk::database::certificates_view>(cert, __FUNCTION__);
+    auto model = (TreeViewModel*)ui->treeAvailableCerts->model();
+    if(!model)
+        model = new TreeViewModel(this);
+    if(model->rowCount(QModelIndex()) == 0){
+        auto table = arcirk::table_from_row(cert);
+        model->set_table(table);
+        ui->treeAvailableCerts->setModel(model);
+    }else
+        model->add(cert);
 }
 
 
@@ -813,15 +857,16 @@ void DialogCertUserCache::on_btnMplItemAdd_clicked()
         }
         auto object = pre::json::to_json(row);
         if(model->columnCount(QModelIndex()) == 0){
-            auto columns = json::array();
-            auto rows = json::array();
-            rows += object;
-            for (auto it = object.items().begin(); it != object.items().end(); ++it) {
-                columns += it.key();
-            }
-            json table = json::object();
-            table["columns"]  = columns;
-            table["rows"] = rows;
+//            auto columns = json::array();
+//            auto rows = json::array();
+//            rows += object;
+//            for (auto it = object.items().begin(); it != object.items().end(); ++it) {
+//                columns += it.key();
+//            }
+//            json table = json::object();
+//            table["columns"]  = columns;
+//            table["rows"] = rows;
+            auto table = arcirk::table_from_row(object);
             model->set_table(table);
             model->set_columns(QVector<QString>{"name", "profile", "url"});
         }else
@@ -928,8 +973,8 @@ void DialogCertUserCache::on_btnResetCertIlst_clicked()
         emit getCertificates(object.host.c_str(), object.system_user.c_str());
     else if(currentTab == 1)
         emit getContainers(object.host.c_str(), object.system_user.c_str());
-    else if(currentTab == 2)
-        emit getAvailableCertificates(object.ref.c_str());
+//    else if(currentTab == 2)
+//        emit getAvailableCertificates(object.ref.c_str());
 }
 
 
@@ -960,6 +1005,40 @@ void DialogCertUserCache::on_btnCertInfo_clicked()
             auto cache_ = nlohmann::json::parse(cache);
             auto dlg = DialogInfo(cache_, first, this);
             dlg.setModal(true);
+            dlg.exec();
+        }
+    }else if(currentTab == 1){
+//        auto model = (TreeViewModel*)ui->treeContainers->model();
+//        if(!model)
+//            return;
+//        auto index = ui->treeContainers->currentIndex();
+//        if(!index.isValid()){
+//            QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
+//            return;
+//        }
+//        auto object = model->get_object(index);
+//        QString vol = object.value("volume", "").c_str();
+//        vol.append(object.value("name", "").c_str());
+//        auto info = current_user->get_container_info(vol);
+//        auto dlg = DialogInfo(info, object.value("name", "").c_str(), this);
+//        dlg.setModal(true);
+//        dlg.exec();
+    }else if(currentTab == 2){
+        auto model = (TreeViewModel*)ui->treeAvailableCerts->model();
+        if(!model)
+            return;
+        auto index = ui->treeAvailableCerts->currentIndex();
+        if(!index.isValid()){
+            QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
+            return;
+        }
+
+        auto object = arcirk::secure_serialization<arcirk::database::certificates_view>(model->get_object(index), __FUNCTION__);
+        if(!object.cache.empty()){
+            auto cert_obj = json::parse(object.cache);
+            auto dlg = DialogInfo(cert_obj, object.first.c_str(), this);
+            dlg.setModal(true);
+            dlg.setWindowTitle(object.first.c_str());
             dlg.exec();
         }
     }
@@ -1037,7 +1116,7 @@ void DialogCertUserCache::column_aliases()
 
 void DialogCertUserCache::on_btnCertAdd_clicked()
 {
-    auto tab = ui->tabWidget->currentIndex();
+    auto tab = ui->tabCrypt->currentIndex();
     if(tab == 0){
 
     }else if(tab == 1){
@@ -1050,7 +1129,25 @@ void DialogCertUserCache::on_btnCertAdd_clicked()
 
 void DialogCertUserCache::on_btnCertDelete_clicked()
 {
+    auto tab = ui->tabCrypt->currentIndex();
+    if(tab == 0){
 
+    }else if(tab == 1){
+
+    }else if(tab == 2){
+        auto index = ui->treeAvailableCerts->currentIndex();
+        if(!index.isValid()){
+            QMessageBox::critical(this, "Ошибка", "Не выбрана строка!");
+            return;
+        }
+
+        if(QMessageBox::question(this, "Удаление", "Удалить выбранный сертификат?") == QMessageBox::No)
+            return;
+
+        auto model = (TreeViewModel*)ui->treeAvailableCerts->model();
+        model->remove(index);
+
+    }
 }
 
 
@@ -1082,7 +1179,7 @@ void DialogCertUserCache::on_btnMstsc_clicked()
     }
 
     auto model = (TreeViewModel*)table->model();
-    auto object = arcirk::secure_serialization<arcirk::client::mstsc_options>(model->get_object(index));
+    auto object = arcirk::secure_serialization<arcirk::client::mstsc_options>(model->get_object(index), __FUNCTION__);
 
     if(!object.reset_user){
         openMstsc(object.name.c_str());
@@ -1121,3 +1218,21 @@ QString DialogCertUserCache::cache_mstsc_directory()
         f.mkpath(f.path());
     return f.path();
 }
+
+void DialogCertUserCache::on_btnMstscCopy_clicked()
+{
+    auto table = ui->treeViewMstsc;
+    auto index = table->currentIndex();
+    if(!index.isValid()){
+        QMessageBox::critical(this, "Ошибка", "Не выбрана строка!");
+        return;
+    }
+
+    auto model = (TreeViewModel*)table->model();
+    auto object = model->get_object(index);
+    object["uuid"] = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
+
+    model->add(object);
+
+}
+

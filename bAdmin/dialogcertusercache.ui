@@ -429,7 +429,7 @@
           <enum>QTabWidget::Rounded</enum>
          </property>
          <property name="currentIndex">
-          <number>0</number>
+          <number>2</number>
          </property>
          <property name="elideMode">
           <enum>Qt::ElideMiddle</enum>
@@ -450,7 +450,17 @@
           </attribute>
           <layout class="QGridLayout" name="gridLayout_10">
            <item row="0" column="0">
-            <widget class="QTreeView" name="treeCertificates"/>
+            <widget class="QTreeView" name="treeCertificates">
+             <property name="alternatingRowColors">
+              <bool>false</bool>
+             </property>
+             <property name="sortingEnabled">
+              <bool>true</bool>
+             </property>
+             <attribute name="headerShowSortIndicator" stdset="0">
+              <bool>true</bool>
+             </attribute>
+            </widget>
            </item>
           </layout>
          </widget>
@@ -650,6 +660,20 @@
            <property name="icon">
             <iconset resource="resurses.qrc">
              <normaloff>:/img/add_24.png</normaloff>:/img/add_24.png</iconset>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="btnMstscCopy">
+           <property name="toolTip">
+            <string>Копировать элемент</string>
+           </property>
+           <property name="text">
+            <string>...</string>
+           </property>
+           <property name="icon">
+            <iconset resource="resurses.qrc">
+             <normaloff>:/img/copy_24.png</normaloff>:/img/copy_24.png</iconset>
            </property>
           </widget>
          </item>

@@ -82,7 +82,7 @@ namespace arcirk{
     }
 
     template<typename T>
-    T secure_serialization(const nlohmann::json &source)
+    T secure_serialization(const nlohmann::json &source, const std::string& fun = "")
     {
         using json = nlohmann::json;
 
@@ -93,7 +93,7 @@ namespace arcirk{
             auto result = pre::json::from_json<T>(source);
             return result;
         }catch (const std::exception& e){
-            std::cerr << __FUNCTION__ << e.what() << std::endl;
+            std::cerr << __FUNCTION__ << " " << fun << " " << e.what() << std::endl;
         }
 
         nlohmann::json object = pre::json::to_json(T());
@@ -108,7 +108,7 @@ namespace arcirk{
                                     object[it.key()].type() == json::value_t::number_float)){
                         object[it.key()] = it.value();
                     }else{
-                        std::cerr << __FUNCTION__ << " Ошибка проверки по типу ключа: " << it.key().c_str() << std::endl;
+                        std::cerr << fun << " " << __FUNCTION__ << " Ошибка проверки по типу ключа: " << it.key().c_str() << std::endl;
                         std::cerr << it.value() << " " << type_string(it.value().type()) << " " << type_string(object[it.key()].type()) <<  std::endl;
                     }
                 }
@@ -119,13 +119,16 @@ namespace arcirk{
     }
 
     template<typename T>
-    T secure_serialization(const std::string &source)
+    T secure_serialization(const std::string &source, const std::string& fun = "")
     {
         using json = nlohmann::json;
         try {
             return secure_serialization<T>(json::parse(source));
         } catch (std::exception& e) {
-            std::cerr << __FUNCTION__ << e.what() << std::endl;
+            if(fun.empty())
+                std::cerr << __FUNCTION__ << " " << e.what() << std::endl;
+            else
+                std::cerr << __FUNCTION__ << " " << fun << " " << e.what() << std::endl;
         }
         return T();
     }
@@ -203,6 +206,23 @@ namespace arcirk{
             return - 1;
         else
             return (int)find;
+    }
+
+    inline nlohmann::json table_from_row(const nlohmann::json& row){
+        using json = nlohmann::json;
+        if(!row.is_object())
+            return {};
+
+        auto columns = json::array();
+        auto rows = json::array();
+        rows += row;
+        for (auto it = row.items().begin(); it != row.items().end(); ++it) {
+            columns += it.key();
+        }
+        json table = json::object();
+        table["columns"]  = columns;
+        table["rows"] = rows;
+        return table;
     }
 }
 
@@ -795,6 +815,22 @@ BOOST_FUSION_DEFINE_STRUCT(
 );
 
 BOOST_FUSION_DEFINE_STRUCT(
+        (arcirk::database), certificates_view,
+        (std::string, first)
+        (std::string, ref)
+        (std::string, cache)
+        (std::string, private_key)
+        (std::string, subject)
+        (std::string, issuer)
+        (std::string, not_valid_before)
+        (std::string, not_valid_after)
+        (std::string, parent_user)
+        (std::string, serial)
+        (std::string, suffix)
+        (std::string, sha1)
+);
+
+BOOST_FUSION_DEFINE_STRUCT(
         (arcirk::database), cert_users,
         (int, _id)
         (std::string, first)
@@ -1107,7 +1143,8 @@ namespace arcirk {
         std::vector<char> key_(p.c_str(), p.c_str() + p.size() + 1);
         void* text = std::data(source_);
         void* pass = std::data(key_);
-        _crypt(text, ARR_SIZE(source.c_str()), pass, ARR_SIZE(key.c_str()));
+        //_crypt(text, ARR_SIZE(source_.c_str()), pass, ARR_SIZE(key.c_str()));
+        _crypt(text, source_.size(), pass, key_.size());
         std::string result(arcirk::to_utf((char*)text));
         return result;
 #else
