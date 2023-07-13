@@ -244,7 +244,7 @@ struct TreeViewModel::NodeInfo
     nlohmann::json rowData;
     QVector<NodeInfo> children;
     NodeInfo* parent;
-
+    QColor textColor;
     bool mapped;
 };
 
@@ -363,6 +363,7 @@ QVariant TreeViewModel::data(const QModelIndex &index, int role) const
     const nlohmann::json& rowData = nodeInfo->rowData;
     Q_ASSERT(nodeInfo != 0);
 
+    if (role != Qt::ForegroundRole) {
     if(index.column() < columns.size()){
         if(index.column() == 0)
             return firstData(rowData, role, index);
@@ -400,27 +401,10 @@ QVariant TreeViewModel::data(const QModelIndex &index, int role) const
         }
 
     }
-//    switch (index.column()) {
-////    case 0:
-////        return rowData["-id"]; ////nameData(fileInfo, role);
-////    case 1:
-////        if (role == Qt::DisplayRole) {
-////            //return fileInfo.lastModified();
-////        }
-////        break;
-////    case 2:
-////        if (role == Qt::DisplayRole) {
-////            //return fileInfo.isDir()? QVariant(): fileInfo.size();
-////        }
-////        break;
-////    case 3:
-////        if (role == Qt::DisplayRole) {
-////            //return _metaProvider->type(fileInfo);
-////        }
-////        break;
-//    default:
-//        break;
-//    }
+    }else{
+        return nodeInfo->textColor;
+    }
+
     return QVariant();
 }
 
@@ -435,29 +419,38 @@ bool TreeViewModel::setData(const QModelIndex &index, const QVariant &value, int
 //	if (index.column() != NameColumn) {
 //		return false;
 //	}
-    auto column_name = get_column_name(role);
-    nlohmann::json val;
-    if(value.typeId() == QMetaType::QString){
-        val = value.toString().toStdString();
-    }else if(value.typeId() == QMetaType::Int){
-        val = value.toInt();
-    }else if(value.typeId() == QMetaType::Double){
-        val = value.toDouble();
-    }else if(value.typeId() == QMetaType::Float){
-        val = value.toFloat();
-    }else if(value.typeId() == QMetaType::Bool){
-        val = value.toBool();
-    }else
-        val = "";
-    NodeInfo* nodeInfo = static_cast<NodeInfo*>(index.internalPointer());
-    Q_ASSERT(nodeInfo != 0);
-//    auto object = nodeInfo->rowData;
-//    nodeInfo->rowData = object;
-    emit dataChanged(index, index.sibling(index.row(), columns.size()));
-    try {
-        nodeInfo->rowData[column_name.toStdString()] = val;
-    } catch (...) {
-        return false;
+    if(role != Qt::ForegroundRole){
+        auto column_name = get_column_name(role);
+        nlohmann::json val;
+        if(value.typeId() == QMetaType::QString){
+            val = value.toString().toStdString();
+        }else if(value.typeId() == QMetaType::Int){
+            val = value.toInt();
+        }else if(value.typeId() == QMetaType::Double){
+            val = value.toDouble();
+        }else if(value.typeId() == QMetaType::Float){
+            val = value.toFloat();
+        }else if(value.typeId() == QMetaType::Bool){
+            val = value.toBool();
+        }else
+            val = "";
+        NodeInfo* nodeInfo = static_cast<NodeInfo*>(index.internalPointer());
+        Q_ASSERT(nodeInfo != 0);
+    //    auto object = nodeInfo->rowData;
+    //    nodeInfo->rowData = object;
+        emit dataChanged(index, index.sibling(index.row(), columns.size()));
+        try {
+            nodeInfo->rowData[column_name.toStdString()] = val;
+        } catch (...) {
+            return false;
+        }
+    }else{
+        if(index.column() == 0){
+            qDebug() << index.column();
+        }
+        NodeInfo* nodeInfo = static_cast<NodeInfo*>(index.internalPointer());
+        Q_ASSERT(nodeInfo != 0);
+        nodeInfo->textColor = value.value<QColor>();
     }
 
 //	QString newName = value.toString();

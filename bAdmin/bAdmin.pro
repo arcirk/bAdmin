@@ -20,7 +20,7 @@ SOURCES += \
     commandlineparser.cpp \
     cryptcertificate.cpp \
     cryptcontainer.cpp \
-    crypter/crypter.cpp \
+    #crypter/crypter.cpp \
     dialogcertusercache.cpp \
     dialogedit.cpp \
     dialoginfo.cpp \
@@ -42,7 +42,8 @@ SOURCES += \
     mainwindow.cpp \
     qjsontablemodel.cpp \
     qproxymodel.cpp \
-    tabledelegate.cpp \
+    sortmodel.cpp \
+    tableviewdelegate.cpp \
     treeviewmodel.cpp \
     websocketclient.cpp \
     winreg/WinReg.cpp
@@ -53,7 +54,7 @@ HEADERS += \
     commandlineparser.h \
     cryptcertificate.h \
     cryptcontainer.h \
-    crypter/crypter.hpp \
+    #crypter/crypter.hpp \
     dialogcertusercache.h \
     dialogedit.h \
     dialoginfo.h \
@@ -76,7 +77,8 @@ HEADERS += \
     qproxymodel.h \
     query_builder.hpp \
     shared_struct.hpp \
-    tabledelegate.h \
+    sortmodel.h \
+    tableviewdelegate.h \
     treeviewmodel.h \
     websocketclient.h \
     winreg/WinReg.hpp

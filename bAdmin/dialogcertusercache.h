@@ -4,6 +4,7 @@
 #include <QDialog>
 #include "shared_struct.hpp"
 #include "treeviewmodel.h"
+#include <QTreeView>
 
 namespace Ui {
 class DialogCertUserCache;
@@ -56,6 +57,8 @@ private slots:
 
     void on_btnMstscCopy_clicked();
 
+    void on_btnProfileCopy_clicked();
+
 private:
     Ui::DialogCertUserCache *ui;
     arcirk::database::cert_users& object;
@@ -100,6 +103,11 @@ private:
     void editMstsc(const QString& host, const QString& usr, const QString& pwd, const QString& name);
     void openMstsc(const QString &name);
     QString cache_mstsc_directory();
+
+    TreeViewModel* get_model(QTreeView * view);
+    QModelIndex get_index(QModelIndex proxy_index, QTreeView *view);
+    void verify_certificate(TreeViewModel *model);
+
 signals:
     void getData(const QUrl &ws, const QString& host, const QString& system_user, QWidget *parent);
     void getMozillaProfiles(const QString& host, const QString& system_user);

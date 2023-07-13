@@ -6,6 +6,7 @@
 #include "shared_struct.hpp"
 #include <QIcon>
 #include <QVector>
+#include "sortmodel.h"
 
 enum item_icons_enum{
     ItemGroup = 0,

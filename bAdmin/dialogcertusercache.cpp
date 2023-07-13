@@ -15,6 +15,8 @@
 #include <QDir>
 #include <QFileDialog>
 #include "commandline.h"
+#include "sortmodel.h"
+#include "tableviewdelegate.h"
 
 DialogCertUserCache::DialogCertUserCache(arcirk::database::cert_users& obj, TreeViewModel * users_model,
                                          const QString& def_url, QWidget *parent) :
@@ -44,7 +46,9 @@ DialogCertUserCache::DialogCertUserCache(arcirk::database::cert_users& obj, Tree
             btn->setText("Отмена");
     }
 
-    //ui->treeCertificates->sortByColumn(0, Qt::AscendingOrder);
+    ui->treeCertificates->setItemDelegate(new TableViewDelegate(this));
+    ui->treeAvailableCerts->setItemDelegate(new TableViewDelegate(this));
+    ui->treeContainers->setItemDelegate(new TableViewDelegate(this));
 }
 
 DialogCertUserCache::~DialogCertUserCache()
@@ -77,6 +81,8 @@ void DialogCertUserCache::accept()
     write_mpl_options();
     write_crypt_data();
     write_available_certificates();
+
+    cache["write_log"] = ui->chkWriteLog->isChecked();
 
     object.cache = cache.dump();
 
@@ -245,7 +251,7 @@ void DialogCertUserCache::read_available_certificates(){
     using namespace arcirk::database;
     using json = nlohmann::json;
     auto table = cache.value("available_certificates", json::object());
-    auto model = (TreeViewModel*)ui->treeAvailableCerts->model();
+    auto model = get_model(ui->treeAvailableCerts); //(TreeViewModel*)ui->treeAvailableCerts->model();
     QVector<QString> m_order{
         "first",
         "subject",
@@ -259,7 +265,9 @@ void DialogCertUserCache::read_available_certificates(){
         model = new TreeViewModel(this);
         model->set_column_aliases(m_colAliases);
         model->set_rows_icon(QIcon(":/img/cert16NoKey.png"));
-        ui->treeAvailableCerts->setModel(model);
+        auto sort_model = new SortModel(this);
+        sort_model->setSourceModel(model);
+        ui->treeAvailableCerts->setModel(sort_model);
     }
     if(!table.empty()){
         model->set_table(table);
@@ -287,10 +295,11 @@ void DialogCertUserCache::read_available_certificates(){
                 ui->treeAvailableCerts->hideColumn(ind);
         }
     }
+    verify_certificate(model);
 }
 
 void DialogCertUserCache::write_available_certificates(){
-    auto model = (TreeViewModel*)ui->treeAvailableCerts->model();
+    auto model = get_model(ui->treeAvailableCerts); //(TreeViewModel*)ui->treeAvailableCerts->model();
     auto table = model->get_table_model(QModelIndex());
     cache["available_certificates"] = table;
 }
@@ -463,7 +472,7 @@ void DialogCertUserCache::read_crypt_data()
 void DialogCertUserCache::write_crypt_data()
 {
     crypt_data.cryptopro_path = ui->txtCryptoProPath->text().toStdString();
-    auto model = (TreeViewModel*)ui->treeCertificates->model();
+    auto model = get_model(ui->treeCertificates); //(TreeViewModel*)ui->treeCertificates->model();
     crypt_data.certs.clear();
     if(model){
         auto table = model->get_table_model(QModelIndex());
@@ -472,7 +481,7 @@ void DialogCertUserCache::write_crypt_data()
         std::copy(table_ba.begin(), table_ba.end(), crypt_data.certs.begin());
     }
 
-    model = (TreeViewModel*)ui->treeContainers->model();
+    model = get_model(ui->treeContainers); //(TreeViewModel*)ui->treeContainers->model();
     crypt_data.conts.clear();
     if(model){
         auto table = model->get_table_model(QModelIndex());
@@ -546,6 +555,9 @@ void DialogCertUserCache::read_cache(const nlohmann::json &data)
     read_available_certificates();
 
     form_control();
+
+    auto m_write_log = cache.value("write_log", false);
+    ui->chkWriteLog->setChecked(m_write_log);
 }
 
 void DialogCertUserCache::form_control()
@@ -662,10 +674,13 @@ void DialogCertUserCache::onCertificates(const arcirk::client::cryptopro_data &d
         model->columns_establish_order(m_order);
         model->set_rows_icon(QIcon(":/img/cert16NoKey.png"));
         model->set_column_aliases(m_colAliases);
-        ui->treeCertificates->setModel(model);
+        auto sort_model = new SortModel(this);
+        sort_model->setSourceModel(model);
+        ui->treeCertificates->setModel(sort_model);
         ui->treeCertificates->hideColumn(model->get_column_index("cache"));
         ui->treeCertificates->hideColumn(model->get_column_index("second"));
         ui->treeCertificates->resizeColumnToContents(0);
+        verify_certificate(model);
     }
 }
 
@@ -685,7 +700,9 @@ void DialogCertUserCache::onContainers(const arcirk::client::cryptopro_data &dat
         model->set_table(table);
         model->columns_establish_order(m_order);
         model->set_column_aliases(m_colAliases);
-        ui->treeContainers->setModel(model);
+        auto sort_model = new SortModel(this);
+        sort_model->setSourceModel(model);
+        ui->treeContainers->setModel(sort_model);
 
         using namespace arcirk::cryptography;
         int ind = model->get_column_index("type");
@@ -736,13 +753,16 @@ void DialogCertUserCache::onSelectCertificate(const json cert)
     qDebug() << __FUNCTION__; // << cert.dump().c_str();
 
     auto cert_ = arcirk::secure_serialization<arcirk::database::certificates_view>(cert, __FUNCTION__);
-    auto model = (TreeViewModel*)ui->treeAvailableCerts->model();
-    if(!model)
+    auto model = get_model(ui->treeAvailableCerts); //(TreeViewModel*)ui->treeAvailableCerts->model();
+    if(!model){
+        auto sort_model = new SortModel(this);
         model = new TreeViewModel(this);
+        sort_model->setSourceModel(model);
+    }
     if(model->rowCount(QModelIndex()) == 0){
         auto table = arcirk::table_from_row(cert);
         model->set_table(table);
-        ui->treeAvailableCerts->setModel(model);
+        //ui->treeAvailableCerts->setModel(model);
     }else
         model->add(cert);
 }
@@ -982,10 +1002,10 @@ void DialogCertUserCache::on_btnCertInfo_clicked()
 {
     auto currentTab = ui->tabCrypt->currentIndex();
     if(currentTab == 0){
-        auto model = (TreeViewModel*)ui->treeCertificates->model();
+        auto model = get_model(ui->treeCertificates);// (TreeViewModel*)ui->treeCertificates->model();
         if(!model)
             return;
-        auto index = ui->treeCertificates->currentIndex();
+        auto index = get_index(ui->treeCertificates->currentIndex(), ui->treeCertificates);
         if(!index.isValid()){
             QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
             return;
@@ -1024,10 +1044,10 @@ void DialogCertUserCache::on_btnCertInfo_clicked()
 //        dlg.setModal(true);
 //        dlg.exec();
     }else if(currentTab == 2){
-        auto model = (TreeViewModel*)ui->treeAvailableCerts->model();
+        auto model = get_model(ui->treeAvailableCerts); //(TreeViewModel*)ui->treeAvailableCerts->model();
         if(!model)
             return;
-        auto index = ui->treeAvailableCerts->currentIndex();
+        auto index = get_index(ui->treeAvailableCerts->currentIndex(), ui->treeAvailableCerts);
         if(!index.isValid()){
             QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
             return;
@@ -1135,7 +1155,7 @@ void DialogCertUserCache::on_btnCertDelete_clicked()
     }else if(tab == 1){
 
     }else if(tab == 2){
-        auto index = ui->treeAvailableCerts->currentIndex();
+        auto index = get_index(ui->treeAvailableCerts->currentIndex(), ui->treeAvailableCerts);
         if(!index.isValid()){
             QMessageBox::critical(this, "Ошибка", "Не выбрана строка!");
             return;
@@ -1144,7 +1164,7 @@ void DialogCertUserCache::on_btnCertDelete_clicked()
         if(QMessageBox::question(this, "Удаление", "Удалить выбранный сертификат?") == QMessageBox::No)
             return;
 
-        auto model = (TreeViewModel*)ui->treeAvailableCerts->model();
+        auto model = get_model(ui->treeAvailableCerts); //(TreeViewModel*)ui->treeAvailableCerts->model();
         model->remove(index);
 
     }
@@ -1219,6 +1239,30 @@ QString DialogCertUserCache::cache_mstsc_directory()
     return f.path();
 }
 
+TreeViewModel *DialogCertUserCache::get_model(QTreeView *view)
+{
+    auto sort_model = (SortModel*)view->model();
+    //Q_ASSERT(sort_model != 0);
+    if(sort_model == 0)
+        return nullptr;
+    auto model = (TreeViewModel*)sort_model->sourceModel();
+    if(model == 0)
+        return nullptr;
+    //Q_ASSERT(model != 0);
+    return model;
+}
+
+QModelIndex DialogCertUserCache::get_index(QModelIndex proxy_index, QTreeView *view)
+{
+    if(!proxy_index.isValid())
+        return QModelIndex();
+    auto sort_model = (SortModel*)view->model();
+    Q_ASSERT(sort_model != 0);
+    auto model = (TreeViewModel*)sort_model->sourceModel();
+    Q_ASSERT(model != 0);
+    return model->find(proxy_index.data().toString(), proxy_index.column(), QModelIndex());
+}
+
 void DialogCertUserCache::on_btnMstscCopy_clicked()
 {
     auto table = ui->treeViewMstsc;
@@ -1236,3 +1280,43 @@ void DialogCertUserCache::on_btnMstscCopy_clicked()
 
 }
 
+
+void DialogCertUserCache::on_btnProfileCopy_clicked()
+{
+    auto table = ui->treeViewMpl;
+    auto index = table->currentIndex();
+    if(!index.isValid()){
+        QMessageBox::critical(this, "Ошибка", "Не выбрана строка!");
+        return;
+    }
+
+    auto model = (TreeViewModel*)table->model();
+    auto object = model->get_object(index);
+
+    model->add(object);
+}
+
+void DialogCertUserCache::verify_certificate(TreeViewModel *model)
+{
+    for (int itr = 0; itr < model->rowCount(QModelIndex()); ++itr) {
+        auto index = model->index(itr, 0, QModelIndex());
+        auto object = model->get_object(index);
+        auto dt_str = object.value("not_valid_after", "");
+        if(!dt_str.empty()){           
+            auto dt = QDateTime::fromString(dt_str.c_str(), "dd.MM.yyyy  hh:mm:ss");
+            //qDebug() << dt;
+            if(dt.isValid()){
+                if(dt < QDateTime::currentDateTime()){
+                    model->setData(index, QColor(Qt::red), Qt::ForegroundRole);
+                }
+            }else{
+                dt = QDateTime::fromString(dt_str.c_str(), "dd.MM.yyyy hh:mm");
+                if(dt.isValid()){
+                    if(dt < QDateTime::currentDateTime()){
+                        model->setData(index, QColor(Qt::red), Qt::ForegroundRole);
+                    }
+                }
+            }
+        }
+    }
+}

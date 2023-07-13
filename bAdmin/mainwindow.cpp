@@ -27,6 +27,7 @@
 #include "commandline.h"
 #include <fmt/core.h>
 #include "dialogselect.h"
+#include "tableviewdelegate.h"
 
 //#include "crypter/crypter.hpp"
 
@@ -35,6 +36,10 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+
+    m_sort_model = new SortModel(this);
+    ui->treeView->setModel(m_sort_model);
+    ui->treeView->setItemDelegate(new TableViewDelegate);
 
     this->createTrayActions();
     this->createTrayIcon();
@@ -139,7 +144,8 @@ void MainWindow::connectionSuccess()
         m_models[arcirk::server::DatabaseUsers]->set_column_aliases(m_colAliases);
         m_models[arcirk::server::DatabaseUsers]->set_server_object(arcirk::server::DatabaseUsers);
         ui->treeView->setUniformRowHeights(true);
-        ui->treeView->setModel(m_models[arcirk::server::DatabaseUsers]);
+        m_sort_model->setSourceModel(m_models[arcirk::server::DatabaseUsers]);
+        //ui->treeView->setModel(m_models[arcirk::server::DatabaseUsers]);
     }
 
     trayShowMessage(QString("Успешное подключение к севрверу: %1:%2").arg(m_client->server_conf().ServerHost.c_str(), QString::number(m_client->server_conf().ServerPort)));
@@ -160,7 +166,8 @@ void MainWindow::connectionChanged(bool state)
     if(!state){
         infoBar->setText("Не подключен");
         tree->clear();
-        ui->treeView->setModel(nullptr);
+        m_sort_model->setSourceModel(nullptr);
+        //ui->treeView->setModel(nullptr);
     }else{
         infoBar->setText(QString("Подключен: %1 (%2)").arg(m_client->conf().server_host.c_str(), m_client->server_conf().ServerName.c_str()));
         if(!tree->topLevelItem(0)){
@@ -272,7 +279,7 @@ void MainWindow::serverResponse(const arcirk::server::server_response &message)
     }else if(message.command == arcirk::enum_synonym(arcirk::server::server_commands::ProfileDeleteFile)){
         if(message.message == "OK"){
             QMessageBox::information(this, "Удаление файла", "Файл успешно удален!");
-            auto model = (TreeViewModel*)ui->treeView->model();
+            auto model = get_model();// (TreeViewModel*)ui->treeView->model();
             model->clear();
             model->fetchRoot("ProfileDirectory");
         }else if(message.message == "error"){
@@ -290,7 +297,7 @@ void MainWindow::serverResponse(const arcirk::server::server_response &message)
         auto sid = param.value("sid", "");
         auto host = param.value("host", "");
         auto system_user = param.value("system_user", "");
-        auto model = (TreeViewModel*)ui->treeView->model();
+        auto model = get_model();//(TreeViewModel*)ui->treeView->model();
         if(model){
             if(model->server_object() == server::server_objects::CertUsers){
                 auto f_index = model->find(sid.c_str(), model->get_column_index("sid"), QModelIndex());
@@ -637,9 +644,10 @@ void MainWindow::tableSetModel(const QString &key)
         nlohmann::json m_key = key.toStdString();
         auto e_key = m_key.get<arcirk::server::server_objects>();
         auto model = m_models[e_key];
-        auto table = ui->treeView;
-        table->setModel(nullptr);
-        table->setModel(model);
+        //auto table = ui->treeView;
+        m_sort_model->setSourceModel(model);
+//        table->setModel(nullptr);
+//        table->setModel(model);
     } catch (const QException& e) {
         qCritical() << e.what();
     }
@@ -715,7 +723,10 @@ void MainWindow::tableResetModel(server::server_objects key, const QByteArray& r
         m_models[key]->reset();
     }
 
-    auto model = ui->treeView->model();
+    if(key == server_objects::Certificates || key == server_objects::LocalhostUserCertificates)
+        verify_certificate(m_models[key]);
+
+    auto model = get_model();//ui->treeView->model();
     if(model)
         if(ui->treeView->model()->columnCount() > 0)
             ui->treeView->resizeColumnToContents(0);
@@ -733,6 +744,9 @@ void MainWindow::resetModel(server::server_objects key, const nlohmann::json &da
         m_models[key]->columns_establish_order(m_order_columns[key]);
     }
     update_icons(key, m_models[key]);
+
+    if(key == server_objects::Certificates || key == server_objects::LocalhostUserCertificates)
+        verify_certificate(m_models[key]);
 
 //    if (key == LocalhostUserCertificates){
 
@@ -924,7 +938,7 @@ void MainWindow::fillDefaultTree()
 
 void MainWindow::on_toolButton_clicked()
 {
-    auto model = (TreeViewModel*)ui->treeView->model();
+    auto model = get_model();//(TreeViewModel*)ui->treeView->model();
 //    auto index = ui->treeView->currentIndex();
 //    if(!index.isValid()){
 //        QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
@@ -1593,7 +1607,7 @@ void MainWindow::insert_container(CryptContainer &cnt)
         };
         auto ba = cnt.to_byate_array();
         resp = m_client->exec_http_query(arcirk::enum_synonym(arcirk::server::server_commands::DownloadFile), param, ba);
-        if(resp  != "error"){
+        if(resp  != WS_RESULT_ERROR){
             auto query_param = nlohmann::json{
                 {"table_name", arcirk::enum_synonym(tables::tbContainers)},
                 {"where_values", nlohmann::json{}},
@@ -1621,8 +1635,12 @@ void MainWindow::insert_container(CryptContainer &cnt)
 
 void MainWindow::update_columns()
 {
-    auto model = (TreeViewModel*)ui->treeView->model();
+    auto model = get_model();//(TreeViewModel*)ui->treeView->model();
     auto table = ui->treeView;
+
+    for (int i = 0; i < model->columnCount(QModelIndex()); ++i) {
+        table->setColumnHidden(i, false);
+    }
 
     QVector<QString> m_hide_std{"is_group", "deletion_mark", "version", "_id", "cache", "deletion_mark", "parent"};
     foreach (auto const& itr, m_hide_std) {
@@ -1662,18 +1680,19 @@ void MainWindow::update_columns()
         }
     }
 
-     ui->treeView->resizeColumnToContents(0);
+    table->resizeColumnToContents(0);
 }
 
-void MainWindow::edit_cert_user(const QModelIndex &index)
+void MainWindow::edit_cert_user(const QModelIndex &index_)
 {
 
+    auto index = get_index(index_);
     if(!index.isValid()){
         QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
         return;
     }
 
-    auto model = (TreeViewModel*)ui->treeView->model();
+    auto model = get_model();//(TreeViewModel*)ui->treeView->model();
     using namespace arcirk::database;
     using json = nlohmann::json;
     using namespace arcirk::server;
@@ -1771,14 +1790,14 @@ QModelIndex MainWindow::findInTable(QAbstractItemModel * model, const QString &v
 
 void MainWindow::on_btnEdit_clicked()
 {
-    auto index = ui->treeView->currentIndex();
+    auto index = get_index(ui->treeView->currentIndex());
 
     if(!index.isValid()){
         QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
         return;
     }
 
-    auto model = (TreeViewModel*)ui->treeView->model();
+    auto model = get_model();//(TreeViewModel*)ui->treeView->model();
     if(model->server_object() == arcirk::server::CertUsers){
         edit_cert_user(index);
     }else if(model->server_object() == arcirk::server::Devices
@@ -1789,14 +1808,15 @@ void MainWindow::on_btnEdit_clicked()
 }
 
 
-void MainWindow::on_treeView_doubleClicked(const QModelIndex &index)
+void MainWindow::on_treeView_doubleClicked(const QModelIndex &index_)
 {
+    auto index = get_index(index_);
     if(!index.isValid()){
         QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
         return;
     }
 
-    auto model = (TreeViewModel*)ui->treeView->model();
+    auto model = get_model();//(TreeViewModel*)ui->treeView->model();
     using namespace arcirk::database;
     using json = nlohmann::json;
     using namespace arcirk::server;
@@ -1938,8 +1958,8 @@ void MainWindow::on_treeView_doubleClicked(const QModelIndex &index)
 
 void MainWindow::on_btnDataImport_clicked()
 {
-    auto model = (TreeViewModel*)ui->treeView->model();
-    auto index = ui->treeView->currentIndex();
+    auto model = get_model();//(TreeViewModel*)ui->treeView->model();
+    auto index = get_index(ui->treeView->currentIndex());
     if(!index.isValid()){
         QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
         return;
@@ -1968,13 +1988,13 @@ void MainWindow::on_btnDataImport_clicked()
 
 void MainWindow::on_btnAdd_clicked()
 {
-    auto model = (TreeViewModel*)ui->treeView->model();
+    auto model = get_model();//(TreeViewModel*)ui->treeView->model();
 
     using namespace arcirk::server;
     using json = nlohmann::json;
 
     if(model->server_object() == arcirk::server::ProfileDirectory){
-        auto index = ui->treeView->currentIndex();
+        auto index = get_index(ui->treeView->currentIndex());
         if(!index.isValid()){
             QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
             return;
@@ -2109,7 +2129,7 @@ void MainWindow::on_btnAdd_clicked()
         }
 
     }else if(model->server_object() == arcirk::server::server_objects::CertUsers){
-        auto index = ui->treeView->currentIndex();
+        auto index = get_index(ui->treeView->currentIndex());
         //QModelIndex current_parent{};
 
         if(index.isValid()){
@@ -2286,8 +2306,8 @@ void MainWindow::on_btnAdd_clicked()
 
 void MainWindow::on_btnDelete_clicked()
 {
-    auto model = (TreeViewModel*)ui->treeView->model();
-    auto index = ui->treeView->currentIndex();
+    auto model = get_model();//(TreeViewModel*)ui->treeView->model();
+    auto index = get_index(ui->treeView->currentIndex());
     if(!index.isValid()){
         QMessageBox::critical(this, "Ошибка", "Не выбрана строка!");
         return;
@@ -2430,8 +2450,8 @@ void MainWindow::on_btnDelete_clicked()
 }
 void MainWindow::on_btnSetLinkDevice_clicked()
 {
-    auto model = (TreeViewModel*)ui->treeView->model();
-    auto index = ui->treeView->currentIndex();
+    auto model = get_model();//(TreeViewModel*)ui->treeView->model();
+    auto index = get_index(ui->treeView->currentIndex());
     if(!index.isValid()){
         QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
         return;
@@ -2513,7 +2533,7 @@ void MainWindow::on_mnuOptions_triggered()
 
 void MainWindow::on_btnTaskRestart_clicked()
 {
-    auto model = (TreeViewModel*)ui->treeView->model();
+    auto model = get_model();//(TreeViewModel*)ui->treeView->model();
     if(model->server_object() == arcirk::server::Services){
         m_client->send_command(arcirk::server::server_commands::TasksRestart, nlohmann::json{});
     }
@@ -2522,8 +2542,8 @@ void MainWindow::on_btnTaskRestart_clicked()
 
 void MainWindow::on_btnStartTask_clicked()
 {
-    auto model = (TreeViewModel*)ui->treeView->model();
-    auto index = ui->treeView->currentIndex();
+    auto model = get_model();//(TreeViewModel*)ui->treeView->model();
+    auto index = get_index(ui->treeView->currentIndex());
     if(!index.isValid()){
         QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
         return;
@@ -2543,8 +2563,8 @@ void MainWindow::on_btnStartTask_clicked()
 
 void MainWindow::on_btnSendClientRelease_clicked()
 {
-    auto model = (TreeViewModel*)ui->treeView->model();
-    auto index = ui->treeView->currentIndex();
+    auto model = get_model();//(TreeViewModel*)ui->treeView->model();
+    auto index = get_index(ui->treeView->currentIndex());
     if(!index.isValid()){
         QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
         return;
@@ -2733,8 +2753,8 @@ void MainWindow::on_btnSendoToClient_clicked()
 
 void MainWindow::on_btnInfo_clicked()
 {
-    auto model = (TreeViewModel*)ui->treeView->model();
-    auto index = ui->treeView->currentIndex();
+    auto model = get_model();//(TreeViewModel*)ui->treeView->model();
+    auto index = get_index(ui->treeView->currentIndex());
     if(!index.isValid()){
         QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
         return;
@@ -2774,9 +2794,9 @@ void MainWindow::on_btnInfo_clicked()
 void MainWindow::on_btnAddGroup_clicked()
 {
 
-    auto model = (TreeViewModel*)ui->treeView->model();
+    auto model = get_model();//(TreeViewModel*)ui->treeView->model();
 
-    auto index = ui->treeView->currentIndex();
+    auto index = get_index(ui->treeView->currentIndex());
 
     if(model->server_object() == arcirk::server::CertUsers){
         auto struct_users = arcirk::database::table_default_struct<database::cert_users>(arcirk::database::tables::tbCertUsers);
@@ -2859,8 +2879,8 @@ void MainWindow::on_btnAddGroup_clicked()
 
 void MainWindow::on_btnRegistryDevice_clicked()
 {
-    auto model = (TreeViewModel*)ui->treeView->model();
-    auto index = ui->treeView->currentIndex();
+    auto model = get_model();//(TreeViewModel*)ui->treeView->model();
+    auto index = get_index(ui->treeView->currentIndex());
     if(!index.isValid()){
         QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
         return;
@@ -2910,7 +2930,7 @@ void MainWindow::on_btnRegistryDevice_clicked()
                                              {"query_param", base64_param}
                                          });
 
-        std::string result = "success";
+        std::string result = WS_RESULT_SUCCESS;
         if(resp.is_string())
             result = resp.get<std::string>();
 
@@ -2920,7 +2940,7 @@ void MainWindow::on_btnRegistryDevice_clicked()
 //            if(!error_message.isEmpty())
 //                QMessageBox::information(this, "Регистрация устройства", error_message);
 //        }
-        if(result == "success"){
+        if(result == WS_RESULT_SUCCESS){
             trayShowMessage("Устройство успешно зарегистрировано!");
         }else{
             if(!error_message.isEmpty()){
@@ -3131,12 +3151,12 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::on_btnRegistryUser_clicked()
 {
-    auto index = ui->treeView->currentIndex();
+    auto index = get_index(ui->treeView->currentIndex());
     if(!index.isValid()){
         QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
         return;
     }
-    auto model = (TreeViewModel*)ui->treeView->model();
+    auto model = get_model();//(TreeViewModel*)ui->treeView->model();
 
     if(model->server_object() == arcirk::server::OnlineUsers){
         auto object = pre::json::from_json<arcirk::client::session_info>(model->get_object(index));
@@ -3327,13 +3347,13 @@ QModelIndex MainWindow::is_user_online(const QString &host, const QString &syste
 
 void MainWindow::on_btnEditCache_clicked()
 {
-    auto index = ui->treeView->currentIndex();
+    auto index = get_index(ui->treeView->currentIndex());
     if(!index.isValid()){
         QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
         return;
     }
 
-    auto model = (TreeViewModel*)ui->treeView->model();
+    auto model = get_model();//(TreeViewModel*)ui->treeView->model();
     using namespace arcirk::database;
     using json = nlohmann::json;
     using namespace arcirk::server;
@@ -3470,13 +3490,13 @@ QString MainWindow::cache_mstsc_directory()
 
 void MainWindow::on_btnSystemUsers_clicked()
 {
-    auto index = ui->treeView->currentIndex();
+    auto index = get_index(ui->treeView->currentIndex());
     if(!index.isValid()){
         QMessageBox::critical(this, "Ошибка", "Не выбран элемент!");
         return;
     }
 
-    auto model = (TreeViewModel*)ui->treeView->model();
+    auto model = get_model();//(TreeViewModel*)ui->treeView->model();
     using namespace arcirk::database;
     using json = nlohmann::json;
     using namespace arcirk::server;
@@ -3513,6 +3533,30 @@ void MainWindow::on_btnSystemUsers_clicked()
     }
 }
 
+TreeViewModel *MainWindow::get_model()
+{
+    auto sort_model = (SortModel*)ui->treeView->model();
+    //Q_ASSERT(sort_model != 0);
+    if(sort_model == 0)
+        return nullptr;
+    auto model = (TreeViewModel*)sort_model->sourceModel();
+    if(model == 0)
+        return nullptr;
+    //Q_ASSERT(model != 0);
+    return model;
+}
+
+QModelIndex MainWindow::get_index(QModelIndex proxy_index)
+{
+    if(!proxy_index.isValid())
+        return QModelIndex();
+    auto sort_model = (SortModel*)ui->treeView->model();
+    Q_ASSERT(sort_model != 0);
+    auto model = (TreeViewModel*)sort_model->sourceModel();
+    Q_ASSERT(model != 0);
+    return model->find(proxy_index.data().toString(), proxy_index.column(), QModelIndex());
+}
+
 void MainWindow::onCommandToClient(const arcirk::server::server_response &message)
 {
     qDebug() << __FUNCTION__;
@@ -3528,4 +3572,28 @@ void MainWindow::onCommandToClient(const arcirk::server::server_response &messag
         emit availableCertificates(certs);
     }
 
+}
+
+void MainWindow::verify_certificate(TreeViewModel *model)
+{
+    for (int itr = 0; itr < model->rowCount(QModelIndex()); ++itr) {
+        auto index = model->index(itr, 0, QModelIndex());
+        auto object = model->get_object(index);
+        auto dt_str = object.value("not_valid_after", "");
+        if(!dt_str.empty()){
+            auto dt = QDateTime::fromString(dt_str.c_str(), "dd.MM.yyyy  hh:mm:ss");
+            if(dt.isValid()){
+                if(dt < QDateTime::currentDateTime()){
+                    model->setData(index, QColor(Qt::red), Qt::ForegroundRole);
+                }
+            }else{
+                dt = QDateTime::fromString(dt_str.c_str(), "dd.MM.yyyy hh:mm");
+                if(dt.isValid()){
+                    if(dt < QDateTime::currentDateTime()){
+                        model->setData(index, QColor(Qt::red), Qt::ForegroundRole);
+                    }
+                }
+            }
+        }
+    }
 }

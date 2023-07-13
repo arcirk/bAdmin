@@ -13,6 +13,7 @@
 #include <QStandardItemModel>
 #include "shared_struct.hpp"
 #include "treeviewmodel.h"
+#include "sortmodel.h"
 #include "certuser.h"
 #include "cryptcontainer.h"
 
@@ -88,6 +89,11 @@ private:
     QMenu           *trayIconMenu;
     QAction         *quitAction;
     QAction         *showAction;
+
+    SortModel* m_sort_model;
+
+    TreeViewModel* get_model();
+    QModelIndex get_index(QModelIndex proxy_index);
 
     QMap<arcirk::server::server_objects,
     QVector<QString>>   m_order_columns{
@@ -168,6 +174,8 @@ private:
     void localhost_cert_to_database(const QString& sha1);
 
     void set_enable_form(bool value);
+    void verify_certificate(TreeViewModel *model);
+
 signals:
     void setConnectionChanged(bool state);
     void certUserData(const QString& host, const QString& system_user, const nlohmann::json& data);

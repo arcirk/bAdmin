@@ -1,13 +1,14 @@
-#ifndef TABLEDELEGATE_H
-#define TABLEDELEGATE_H
+#ifndef TABLEVIEWDELEGATE_H
+#define TABLEVIEWDELEGATE_H
+
 #include <QStyledItemDelegate>
 #include <QObject>
 
-class TableDelegate : public QStyledItemDelegate
+class TableViewDelegate : public QStyledItemDelegate
 {
     Q_OBJECT
 public:
-    TableDelegate(QWidget *parent = 0) : QStyledItemDelegate(parent) {}
+    TableViewDelegate(QWidget *parent = 0) : QStyledItemDelegate(parent) {}
 
     void paint(QPainter *painter, const QStyleOptionViewItem &option,
                const QModelIndex &index) const;
@@ -19,4 +20,5 @@ public:
 private slots:
 
 };
-#endif // TABLEDELEGATE_H
+
+#endif // TABLEVIEWDELEGATE_H
